@@ -75,6 +75,7 @@ if command -v shellcheck >/dev/null 2>&1; then
     test_case "shellcheck: bin/arrctl" shellcheck -s sh "${REPO_DIR}/bin/arrctl"
     test_case "shellcheck: lib/common.sh" shellcheck -s sh "${REPO_DIR}/lib/common.sh"
     test_case "shellcheck: lib/sonarr.sh" shellcheck -s sh "${REPO_DIR}/lib/sonarr.sh"
+    test_case "shellcheck: lib/radarr.sh" shellcheck -s sh "${REPO_DIR}/lib/radarr.sh"
 else
     skip "shellcheck not installed"
 fi
@@ -83,6 +84,7 @@ if command -v dash >/dev/null 2>&1; then
     test_case "dash -n: bin/arrctl" dash -n "${REPO_DIR}/bin/arrctl"
     test_case "dash -n: lib/common.sh" dash -n "${REPO_DIR}/lib/common.sh"
     test_case "dash -n: lib/sonarr.sh" dash -n "${REPO_DIR}/lib/sonarr.sh"
+    test_case "dash -n: lib/radarr.sh" dash -n "${REPO_DIR}/lib/radarr.sh"
 else
     skip "dash not installed"
 fi
@@ -93,11 +95,14 @@ test_case "arrctl --help works" "$ARRCTL" --help
 test_case "arrctl --version works" "$ARRCTL" --version
 test_case "arrctl sonarr --help works" "$ARRCTL" sonarr --help
 test_case "arrctl sonarr help works" "$ARRCTL" sonarr help
+test_case "arrctl radarr --help works" "$ARRCTL" radarr --help
+test_case "arrctl radarr help works" "$ARRCTL" radarr help
 
 # Invalid command handling
 printf '\n%s\n' "--- Error Handling ---"
 test_case_fail "arrctl invalid-command fails" "$ARRCTL" invalid-command
 test_case_fail "arrctl sonarr invalid-subcommand fails" "$ARRCTL" sonarr invalid-subcommand
+test_case_fail "arrctl radarr invalid-subcommand fails" "$ARRCTL" radarr invalid-subcommand
 
 # Help output contains expected content
 printf '\n%s\n' "--- Help Content ---"
@@ -105,6 +110,12 @@ if "$ARRCTL" --help 2>&1 | grep -q "sonarr"; then
     pass "Main help mentions sonarr"
 else
     fail "Main help mentions sonarr"
+fi
+
+if "$ARRCTL" --help 2>&1 | grep -q "radarr"; then
+    pass "Main help mentions radarr"
+else
+    fail "Main help mentions radarr"
 fi
 
 if "$ARRCTL" sonarr --help 2>&1 | grep -q "list"; then
@@ -123,6 +134,24 @@ if "$ARRCTL" sonarr --help 2>&1 | grep -q "add"; then
     pass "Sonarr help mentions add"
 else
     fail "Sonarr help mentions add"
+fi
+
+if "$ARRCTL" radarr --help 2>&1 | grep -q "list"; then
+    pass "Radarr help mentions list"
+else
+    fail "Radarr help mentions list"
+fi
+
+if "$ARRCTL" radarr --help 2>&1 | grep -q "search"; then
+    pass "Radarr help mentions search"
+else
+    fail "Radarr help mentions search"
+fi
+
+if "$ARRCTL" radarr --help 2>&1 | grep -q "add"; then
+    pass "Radarr help mentions add"
+else
+    fail "Radarr help mentions add"
 fi
 
 # Summary
