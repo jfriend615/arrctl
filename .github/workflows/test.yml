@@ -1,0 +1,30 @@
+name: Test
+
+on: [push, pull_request]
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: .
+          additional_files: bin/arrctl lib/*.sh
+
+  posix:
+    name: POSIX Compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dash
+        run: sudo apt-get update && sudo apt-get install -y dash
+
+      - name: Test with dash
+        run: dash bin/arrctl --help
