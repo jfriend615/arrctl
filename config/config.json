@@ -1,0 +1,18 @@
+{
+  "sonarr": {
+    "url": "http://localhost:8989",
+    "api_key": "your-sonarr-api-key-here"
+  },
+  "radarr": {
+    "url": "http://localhost:7878",
+    "api_key": "your-radarr-api-key-here"
+  },
+  "overseerr": {
+    "url": "http://localhost:5055",
+    "api_key": "your-overseerr-api-key-here"
+  },
+  "tautulli": {
+    "url": "http://localhost:8181",
+    "api_key": "your-tautulli-api-key-here"
+  }
+}

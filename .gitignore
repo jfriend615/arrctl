@@ -1,0 +1,31 @@
+# User configuration (may contain API keys)
+# Note: config/config.json is the template and IS tracked
+*.local.json
+
+# User config directory
+.config/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-*
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
