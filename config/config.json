@@ -1,7 +1,11 @@
 {
   "sonarr": {
     "url": "http://localhost:8989",
-    "api_key": "your-sonarr-api-key-here"
+    "api_key": "your-sonarr-api-key-here",
+    "defaults": {
+      "qualityProfile": "HD-1080p",
+      "rootFolder": "/tv"
+    }
   },
   "radarr": {
     "url": "http://localhost:7878",

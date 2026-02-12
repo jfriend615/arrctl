@@ -5,6 +5,10 @@
 # Default config path
 DEFAULT_CONFIG="${HOME}/.config/arrctl/config.json"
 
+# Global output settings (set by parse_service_args)
+OUTPUT_FORMAT="${OUTPUT_FORMAT:-auto}"
+QUIET_MODE="${QUIET_MODE:-0}"
+
 # Print error message and exit
 # Usage: die "error message"
 die() {
@@ -76,9 +80,10 @@ load_config() {
     die "No configuration found. Set environment variables or create $_config_file"
 }
 
-# Make API request
+# Make API request with proper HTTP code handling
 # Usage: api_request "GET" "/api/v3/series" [data]
 # Outputs: JSON response to stdout
+# Sets: HTTP_CODE global with response status
 api_request() {
     _method="$1"
     _endpoint="$2"
@@ -94,44 +99,69 @@ api_request() {
     _base_url="${SERVICE_URL%/}"
     _url="${_base_url}${_endpoint}"
     
+    # Use -w to append HTTP code on a new line, then parse it out
     case "$_method" in
         GET)
-            curl -s -f -X GET \
+            _response="$(curl -s -X GET \
                 -H "X-Api-Key: ${SERVICE_API_KEY}" \
                 -H "Accept: application/json" \
-                "$_url"
+                -w "\n%{http_code}" \
+                "$_url")"
             ;;
         POST)
-            curl -s -f -X POST \
+            _response="$(curl -s -X POST \
                 -H "X-Api-Key: ${SERVICE_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/json" \
                 -d "$_data" \
-                "$_url"
+                -w "\n%{http_code}" \
+                "$_url")"
             ;;
         PUT)
-            curl -s -f -X PUT \
+            _response="$(curl -s -X PUT \
                 -H "X-Api-Key: ${SERVICE_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/json" \
                 -d "$_data" \
-                "$_url"
+                -w "\n%{http_code}" \
+                "$_url")"
             ;;
         DELETE)
-            curl -s -f -X DELETE \
+            _response="$(curl -s -X DELETE \
                 -H "X-Api-Key: ${SERVICE_API_KEY}" \
                 -H "Accept: application/json" \
-                "$_url"
+                -w "\n%{http_code}" \
+                "$_url")"
             ;;
         *)
             die "Unknown HTTP method: $_method"
             ;;
     esac
     
-    _exit_code=$?
-    if [ $_exit_code -ne 0 ]; then
-        die "API request failed (curl exit code: $_exit_code)"
-    fi
+    # Extract HTTP code from last line
+    HTTP_CODE="$(printf '%s' "$_response" | tail -n1)"
+    _body="$(printf '%s' "$_response" | sed '$d')"
+    
+    # Handle HTTP errors
+    case "$HTTP_CODE" in
+        2*)
+            # Success - output body
+            printf '%s\n' "$_body"
+            ;;
+        401)
+            die "Authentication failed - check API key"
+            ;;
+        404)
+            die "Not found: $_endpoint"
+            ;;
+        *)
+            if [ -n "$_body" ]; then
+                die "API request failed (HTTP $HTTP_CODE): $_body"
+            else
+                die "API request failed (HTTP $HTTP_CODE)"
+            fi
+            ;;
+    esac
 }
 
 # Format JSON output for human reading (when stdout is terminal)
@@ -169,4 +199,99 @@ parse_common_opts() {
                 ;;
         esac
     done
+}
+
+# Parse service-level args for --format and --quiet
+# Sets: OUTPUT_FORMAT, QUIET_MODE globals
+# Returns remaining args via _REMAINING_ARGS
+# Usage: parse_service_args "$@"; eval "set -- $_REMAINING_ARGS"
+parse_service_args() {
+    _REMAINING_ARGS=""
+    OUTPUT_FORMAT="auto"
+    QUIET_MODE=0
+    
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --format)
+                if [ -z "${2:-}" ]; then
+                    die "--format requires a value (json|table|auto)"
+                fi
+                OUTPUT_FORMAT="$2"
+                shift 2
+                ;;
+            --format=*)
+                OUTPUT_FORMAT="${1#--format=}"
+                shift
+                ;;
+            -q|--quiet)
+                QUIET_MODE=1
+                shift
+                ;;
+            *)
+                _REMAINING_ARGS="$_REMAINING_ARGS '$1'"
+                shift
+                ;;
+        esac
+    done
+    
+    # Validate format
+    case "$OUTPUT_FORMAT" in
+        json|table|auto) ;;
+        *) die "Invalid format: $OUTPUT_FORMAT (use json|table|auto)" ;;
+    esac
+}
+
+# Format JSON as table using jq
+# Usage: echo "$json" | format_table "headers" "jq_expression"
+# Example: echo "$json" | format_table "ID|Title|Year" '.[] | [.id, .title, .year]'
+format_table() {
+    _headers="$1"
+    _jq_expr="$2"
+    
+    check_deps jq
+    
+    # Determine if we should use table format
+    _use_table=0
+    case "$OUTPUT_FORMAT" in
+        table) _use_table=1 ;;
+        auto) [ -t 1 ] && _use_table=1 ;;
+    esac
+    
+    if [ "$_use_table" -eq 1 ]; then
+        # Print headers
+        printf '%s\n' "$_headers" | tr '|' '\t'
+        printf '%s\n' "$_headers" | sed 's/[^|]/-/g' | tr '|' '\t'
+        # Print rows
+        jq -r "$_jq_expr | @tsv"
+    else
+        # Pass through as JSON
+        jq '.'
+    fi
+}
+
+# URL encode a string (POSIX compliant)
+# Usage: url_encode "search term"
+url_encode() {
+    _string="$1"
+    printf '%s' "$_string" | jq -sRr @uri
+}
+
+# Get config value with fallback
+# Usage: get_config_value "sonarr" "defaults.qualityProfile" "default_value"
+get_config_value() {
+    _service="$1"
+    _key="$2"
+    _default="${3:-}"
+    
+    _config_file="${ARRCTL_CONFIG:-$DEFAULT_CONFIG}"
+    
+    if [ -f "$_config_file" ]; then
+        _value="$(jq -r ".${_service}.${_key} // empty" "$_config_file" 2>/dev/null)"
+        if [ -n "$_value" ]; then
+            printf '%s' "$_value"
+            return 0
+        fi
+    fi
+    
+    printf '%s' "$_default"
 }
