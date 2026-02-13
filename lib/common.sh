@@ -258,11 +258,18 @@ format_table() {
     esac
     
     if [ "$_use_table" -eq 1 ]; then
-        # Print headers
-        printf '%s\n' "$_headers" | tr '|' '\t'
-        printf '%s\n' "$_headers" | sed 's/[^|]/-/g' | tr '|' '\t'
-        # Print rows
-        jq -r "$_jq_expr | @tsv"
+        # Check if column command is available
+        if command -v column >/dev/null 2>&1; then
+            # Build table with headers and pipe to column for alignment
+            {
+                printf '%s\n' "$_headers"
+                jq -r "$_jq_expr | join(\"|\")"
+            } | column -t -s '|'
+        else
+            # Fallback to simple tab format if column not available
+            printf '%s\n' "$_headers" | tr '|' '\t'
+            jq -r "$_jq_expr | @tsv"
+        fi
     else
         # Pass through as JSON
         jq '.'
