@@ -78,6 +78,7 @@ if command -v shellcheck >/dev/null 2>&1; then
     test_case "shellcheck: lib/radarr.sh" shellcheck -s sh "${REPO_DIR}/lib/radarr.sh"
     test_case "shellcheck: lib/tautulli.sh" shellcheck -s sh "${REPO_DIR}/lib/tautulli.sh"
     test_case "shellcheck: lib/overseerr.sh" shellcheck -s sh "${REPO_DIR}/lib/overseerr.sh"
+    test_case "shellcheck: install.sh" shellcheck -s sh "${REPO_DIR}/install.sh"
 else
     skip "shellcheck not installed"
 fi
@@ -89,6 +90,7 @@ if command -v dash >/dev/null 2>&1; then
     test_case "dash -n: lib/radarr.sh" dash -n "${REPO_DIR}/lib/radarr.sh"
     test_case "dash -n: lib/tautulli.sh" dash -n "${REPO_DIR}/lib/tautulli.sh"
     test_case "dash -n: lib/overseerr.sh" dash -n "${REPO_DIR}/lib/overseerr.sh"
+    test_case "dash -n: install.sh" dash -n "${REPO_DIR}/install.sh"
 else
     skip "dash not installed"
 fi
