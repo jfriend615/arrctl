@@ -26,9 +26,42 @@ LIB_DIR="${SCRIPT_DIR}/../lib"
 . "${LIB_DIR}/common.sh"
 
 VERSION="0.1.0"
+INSTALL_DIR="${SCRIPT_DIR}/.."
 
 show_version() {
     printf "arrctl version %s\n" "$VERSION"
+}
+
+# Self-update command
+arrctl_update() {
+    # Check if installed via git (has .git directory)
+    if [ ! -d "${INSTALL_DIR}/.git" ]; then
+        die "arrctl does not appear to be installed via git. Cannot auto-update."
+    fi
+
+    # Check if git is available
+    if ! command -v git >/dev/null 2>&1; then
+        die "git is required for updates."
+    fi
+
+    # Store current version for comparison
+    _before=$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+    info "Checking for updates..."
+
+    # Pull latest changes
+    if git -C "$INSTALL_DIR" pull origin main 2>&1; then
+        _after=$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+        if [ "$_before" = "$_after" ]; then
+            info "Already up to date ($_after)"
+        else
+            info "Updated: $_before -> $_after"
+            info "arrctl is now up to date!"
+        fi
+    else
+        die "Update failed. Check your internet connection or try manually: cd $INSTALL_DIR && git pull"
+    fi
 }
 
 show_help() {
@@ -42,6 +75,7 @@ Commands:
     radarr      Manage Radarr (Movies)
     overseerr   Manage Overseerr (Requests)
     tautulli    View Plex activity (who is streaming)
+    update      Update arrctl to the latest version
 
 Options:
     -h, --help      Show this help message
@@ -89,6 +123,10 @@ main() {
         -v|--version)
             show_version
             exit 0
+            ;;
+        update)
+            shift
+            arrctl_update "$@"
             ;;
         sonarr|radarr|overseerr|tautulli)
             SERVICE="$1"
