@@ -29,7 +29,7 @@ Commands:
     sonarr      Manage Sonarr (TV shows)
     radarr      Manage Radarr (Movies)
     overseerr   Manage Overseerr (Requests)
-    tautulli    Manage Tautulli (Plex stats)
+    tautulli    View Plex activity (who is streaming)
 
 Options:
     -h, --help      Show this help message
@@ -55,6 +55,7 @@ Examples:
     arrctl radarr list --monitored
     arrctl radarr search "The Matrix"
     arrctl radarr add --id 603 --search
+    arrctl tautulli now
 
 EOF
 }

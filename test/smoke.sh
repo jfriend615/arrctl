@@ -76,6 +76,7 @@ if command -v shellcheck >/dev/null 2>&1; then
     test_case "shellcheck: lib/common.sh" shellcheck -s sh "${REPO_DIR}/lib/common.sh"
     test_case "shellcheck: lib/sonarr.sh" shellcheck -s sh "${REPO_DIR}/lib/sonarr.sh"
     test_case "shellcheck: lib/radarr.sh" shellcheck -s sh "${REPO_DIR}/lib/radarr.sh"
+    test_case "shellcheck: lib/tautulli.sh" shellcheck -s sh "${REPO_DIR}/lib/tautulli.sh"
 else
     skip "shellcheck not installed"
 fi
@@ -85,6 +86,7 @@ if command -v dash >/dev/null 2>&1; then
     test_case "dash -n: lib/common.sh" dash -n "${REPO_DIR}/lib/common.sh"
     test_case "dash -n: lib/sonarr.sh" dash -n "${REPO_DIR}/lib/sonarr.sh"
     test_case "dash -n: lib/radarr.sh" dash -n "${REPO_DIR}/lib/radarr.sh"
+    test_case "dash -n: lib/tautulli.sh" dash -n "${REPO_DIR}/lib/tautulli.sh"
 else
     skip "dash not installed"
 fi
@@ -97,12 +99,15 @@ test_case "arrctl sonarr --help works" "$ARRCTL" sonarr --help
 test_case "arrctl sonarr help works" "$ARRCTL" sonarr help
 test_case "arrctl radarr --help works" "$ARRCTL" radarr --help
 test_case "arrctl radarr help works" "$ARRCTL" radarr help
+test_case "arrctl tautulli --help works" "$ARRCTL" tautulli --help
+test_case "arrctl tautulli help works" "$ARRCTL" tautulli help
 
 # Invalid command handling
 printf '\n%s\n' "--- Error Handling ---"
 test_case_fail "arrctl invalid-command fails" "$ARRCTL" invalid-command
 test_case_fail "arrctl sonarr invalid-subcommand fails" "$ARRCTL" sonarr invalid-subcommand
 test_case_fail "arrctl radarr invalid-subcommand fails" "$ARRCTL" radarr invalid-subcommand
+test_case_fail "arrctl tautulli invalid-subcommand fails" "$ARRCTL" tautulli invalid-subcommand
 
 # Help output contains expected content
 printf '\n%s\n' "--- Help Content ---"
@@ -116,6 +121,12 @@ if "$ARRCTL" --help 2>&1 | grep -q "radarr"; then
     pass "Main help mentions radarr"
 else
     fail "Main help mentions radarr"
+fi
+
+if "$ARRCTL" --help 2>&1 | grep -q "tautulli"; then
+    pass "Main help mentions tautulli"
+else
+    fail "Main help mentions tautulli"
 fi
 
 if "$ARRCTL" sonarr --help 2>&1 | grep -q "list"; then
@@ -152,6 +163,12 @@ if "$ARRCTL" radarr --help 2>&1 | grep -q "add"; then
     pass "Radarr help mentions add"
 else
     fail "Radarr help mentions add"
+fi
+
+if "$ARRCTL" tautulli --help 2>&1 | grep -q "now"; then
+    pass "Tautulli help mentions now"
+else
+    fail "Tautulli help mentions now"
 fi
 
 # Summary
