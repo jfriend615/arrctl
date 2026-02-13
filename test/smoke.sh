@@ -99,6 +99,7 @@ fi
 printf '\n%s\n' "--- Help Commands ---"
 test_case "arrctl --help works" "$ARRCTL" --help
 test_case "arrctl --version works" "$ARRCTL" --version
+test_case "arrctl update works (in git repo)" "$ARRCTL" update
 test_case "arrctl sonarr --help works" "$ARRCTL" sonarr --help
 test_case "arrctl sonarr help works" "$ARRCTL" sonarr help
 test_case "arrctl radarr --help works" "$ARRCTL" radarr --help
@@ -140,6 +141,12 @@ if "$ARRCTL" --help 2>&1 | grep -q "overseerr"; then
     pass "Main help mentions overseerr"
 else
     fail "Main help mentions overseerr"
+fi
+
+if "$ARRCTL" --help 2>&1 | grep -q "update"; then
+    pass "Main help mentions update"
+else
+    fail "Main help mentions update"
 fi
 
 if "$ARRCTL" sonarr --help 2>&1 | grep -q "list"; then
