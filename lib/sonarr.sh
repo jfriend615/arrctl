@@ -13,6 +13,7 @@ Commands:
     list              List all series in library
     search <term>     Search for series by name
     add               Add a series to library
+    calendar          Show upcoming episodes
 
 List Options:
     --monitored       Show only monitored series
@@ -32,12 +33,19 @@ Add Options:
     --monitored       Monitor the series (default: true)
     --no-monitored    Don't monitor the series
 
+Calendar Options:
+    --days N          Show next N days (default: 7)
+    --start DATE      Start date (YYYY-MM-DD)
+    --end DATE        End date (YYYY-MM-DD)
+    --format FORMAT   Output format: json|table|auto (default: auto)
+
 Examples:
     arrctl sonarr list
     arrctl sonarr list --monitored --format table
     arrctl sonarr search "Breaking Bad"
     arrctl sonarr search "The Office" --limit 5
     arrctl sonarr add --id 81189 --quality "HD-1080p" --search
+    arrctl sonarr calendar --days 14
 
 EOF
 }
@@ -79,6 +87,10 @@ sonarr_main() {
         add)
             shift
             sonarr_add "$@"
+            ;;
+        calendar)
+            shift
+            sonarr_calendar "$@"
             ;;
         *)
             die "Unknown sonarr command: $1. Use 'arrctl sonarr --help' for usage."
@@ -407,4 +419,97 @@ _sonarr_resolve_root_folder() {
     fi
     
     printf '%s' "$_path"
+}
+
+# Get calendar entries (upcoming episodes)
+# Usage: sonarr_calendar [--days N] [--start DATE] [--end DATE]
+sonarr_calendar() {
+    _days=7
+    _start=""
+    _end=""
+    
+    # Parse calendar-specific options
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --days)
+                if [ -z "${2:-}" ]; then
+                    die "--days requires a number"
+                fi
+                _days="$2"
+                shift 2
+                ;;
+            --days=*)
+                _days="${1#--days=}"
+                shift
+                ;;
+            --start)
+                if [ -z "${2:-}" ]; then
+                    die "--start requires a date (YYYY-MM-DD)"
+                fi
+                _start="$2"
+                shift 2
+                ;;
+            --start=*)
+                _start="${1#--start=}"
+                shift
+                ;;
+            --end)
+                if [ -z "${2:-}" ]; then
+                    die "--end requires a date (YYYY-MM-DD)"
+                fi
+                _end="$2"
+                shift 2
+                ;;
+            --end=*)
+                _end="${1#--end=}"
+                shift
+                ;;
+            -h|--help)
+                sonarr_help
+                return 0
+                ;;
+            *)
+                die "Unknown option: $1"
+                ;;
+        esac
+    done
+    
+    # Calculate dates if not provided
+    if [ -z "$_start" ]; then
+        _start=$(date +%Y-%m-%d)
+    fi
+    if [ -z "$_end" ]; then
+        # Try BSD date first, fall back to GNU date
+        _end=$(date -v+"${_days}"d +%Y-%m-%d 2>/dev/null || date -d "+${_days} days" +%Y-%m-%d)
+    fi
+    
+    # Fetch calendar data
+    _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
+    
+    # Format output - transform to unified format with date, title, episode, service
+    printf '%s' "$_response" | jq '[.[] | {
+        date: (.airDateUtc | split("T")[0]),
+        title: .series.title,
+        episode: ("S" + (if .seasonNumber < 10 then "0" else "" end) + (.seasonNumber | tostring) + "E" + (if .episodeNumber < 10 then "0" else "" end) + (.episodeNumber | tostring) + " - " + .title),
+        service: "Sonarr"
+    }]'
+}
+
+# Get calendar entries in raw JSON format for merging
+# Usage: sonarr_calendar_raw start_date end_date
+# Outputs normalized JSON array for calendar merging
+sonarr_calendar_raw() {
+    _start="$1"
+    _end="$2"
+    
+    # Fetch calendar data
+    _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
+    
+    # Transform to unified format
+    printf '%s' "$_response" | jq '[.[] | {
+        date: (.airDateUtc | split("T")[0]),
+        title: .series.title,
+        episode: ("S" + (if .seasonNumber < 10 then "0" else "" end) + (.seasonNumber | tostring) + "E" + (if .episodeNumber < 10 then "0" else "" end) + (.episodeNumber | tostring) + " - " + .title),
+        service: "Sonarr"
+    }]'
 }

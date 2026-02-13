@@ -13,6 +13,7 @@ Commands:
     list              List all movies in library
     search <term>     Search for movies by name
     add               Add a movie to library
+    calendar          Show upcoming movie releases
 
 List Options:
     --monitored       Show only monitored movies
@@ -32,12 +33,19 @@ Add Options:
     --monitored       Monitor the movie (default: true)
     --no-monitored    Don't monitor the movie
 
+Calendar Options:
+    --days N          Show next N days (default: 7)
+    --start DATE      Start date (YYYY-MM-DD)
+    --end DATE        End date (YYYY-MM-DD)
+    --format FORMAT   Output format: json|table|auto (default: auto)
+
 Examples:
     arrctl radarr list
     arrctl radarr list --monitored --format table
     arrctl radarr search "The Matrix"
     arrctl radarr search "Dune" --limit 5
     arrctl radarr add --id 603 --quality "HD-1080p" --search
+    arrctl radarr calendar --days 30
 
 EOF
 }
@@ -79,6 +87,10 @@ radarr_main() {
         add)
             shift
             radarr_add "$@"
+            ;;
+        calendar)
+            shift
+            radarr_calendar "$@"
             ;;
         *)
             die "Unknown radarr command: $1. Use 'arrctl radarr --help' for usage."
@@ -405,4 +417,98 @@ _radarr_resolve_root_folder() {
     fi
     
     printf '%s' "$_path"
+}
+
+# Get calendar entries (upcoming movie releases)
+# Usage: radarr_calendar [--days N] [--start DATE] [--end DATE]
+radarr_calendar() {
+    _days=7
+    _start=""
+    _end=""
+    
+    # Parse calendar-specific options
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --days)
+                if [ -z "${2:-}" ]; then
+                    die "--days requires a number"
+                fi
+                _days="$2"
+                shift 2
+                ;;
+            --days=*)
+                _days="${1#--days=}"
+                shift
+                ;;
+            --start)
+                if [ -z "${2:-}" ]; then
+                    die "--start requires a date (YYYY-MM-DD)"
+                fi
+                _start="$2"
+                shift 2
+                ;;
+            --start=*)
+                _start="${1#--start=}"
+                shift
+                ;;
+            --end)
+                if [ -z "${2:-}" ]; then
+                    die "--end requires a date (YYYY-MM-DD)"
+                fi
+                _end="$2"
+                shift 2
+                ;;
+            --end=*)
+                _end="${1#--end=}"
+                shift
+                ;;
+            -h|--help)
+                radarr_help
+                return 0
+                ;;
+            *)
+                die "Unknown option: $1"
+                ;;
+        esac
+    done
+    
+    # Calculate dates if not provided
+    if [ -z "$_start" ]; then
+        _start=$(date +%Y-%m-%d)
+    fi
+    if [ -z "$_end" ]; then
+        # Try BSD date first, fall back to GNU date
+        _end=$(date -v+"${_days}"d +%Y-%m-%d 2>/dev/null || date -d "+${_days} days" +%Y-%m-%d)
+    fi
+    
+    # Fetch calendar data
+    _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
+    
+    # Format output - transform to unified format with date, title, episode (empty for movies), service
+    # Use digitalRelease if available, otherwise inCinemas, otherwise physicalRelease
+    printf '%s' "$_response" | jq '[.[] | {
+        date: ((.digitalRelease // .inCinemas // .physicalRelease // "") | split("T")[0]),
+        title: .title,
+        episode: "",
+        service: "Radarr"
+    }] | map(select(.date != ""))'
+}
+
+# Get calendar entries in raw JSON format for merging
+# Usage: radarr_calendar_raw start_date end_date
+# Outputs normalized JSON array for calendar merging
+radarr_calendar_raw() {
+    _start="$1"
+    _end="$2"
+    
+    # Fetch calendar data
+    _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
+    
+    # Transform to unified format
+    printf '%s' "$_response" | jq '[.[] | {
+        date: ((.digitalRelease // .inCinemas // .physicalRelease // "") | split("T")[0]),
+        title: .title,
+        episode: "",
+        service: "Radarr"
+    }] | map(select(.date != ""))'
 }

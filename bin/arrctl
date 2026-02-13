@@ -64,6 +64,171 @@ arrctl_update() {
     fi
 }
 
+# Show help for calendar command
+calendar_help() {
+    cat <<EOF
+arrctl calendar - Unified calendar view for upcoming releases
+
+Usage: arrctl calendar [options]
+
+Options:
+    --days N          Show next N days (default: 7)
+    --week            Show this week (Monday to Sunday)
+    --sonarr          Show only TV episodes (Sonarr)
+    --radarr          Show only movies (Radarr)
+    --format FORMAT   Output format: json|table|auto (default: auto)
+    -h, --help        Show this help message
+
+Examples:
+    arrctl calendar                    # Next 7 days, both services
+    arrctl calendar --week             # This week (Mon-Sun)
+    arrctl calendar --sonarr           # TV only
+    arrctl calendar --radarr           # Movies only
+    arrctl calendar --days 14          # Next 2 weeks
+
+EOF
+}
+
+# Calendar command - show upcoming releases from Sonarr and Radarr
+arrctl_calendar() {
+    _days=7
+    _week=0
+    _sonarr=1
+    _radarr=1
+    _format="auto"
+    
+    # Parse options
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --days)
+                if [ -z "${2:-}" ]; then
+                    die "--days requires a number"
+                fi
+                _days="$2"
+                shift 2
+                ;;
+            --days=*)
+                _days="${1#--days=}"
+                shift
+                ;;
+            --week)
+                _week=1
+                shift
+                ;;
+            --sonarr)
+                _sonarr=1
+                _radarr=0
+                shift
+                ;;
+            --radarr)
+                _sonarr=0
+                _radarr=1
+                shift
+                ;;
+            --format)
+                if [ -z "${2:-}" ]; then
+                    die "--format requires a value (json|table|auto)"
+                fi
+                _format="$2"
+                shift 2
+                ;;
+            --format=*)
+                _format="${1#--format=}"
+                shift
+                ;;
+            -h|--help|help)
+                calendar_help
+                return 0
+                ;;
+            *)
+                die "Unknown option: $1. Use 'arrctl calendar --help' for usage."
+                ;;
+        esac
+    done
+    
+    # Calculate start and end dates
+    if [ "$_week" -eq 1 ]; then
+        # This week: Monday to Sunday
+        # Get day of week (1=Monday, 7=Sunday)
+        _dow=$(date +%u)
+        _days_to_monday=$((_dow - 1))
+        _days_to_sunday=$((7 - _dow))
+        
+        # BSD date (macOS) vs GNU date (Linux)
+        if date -v-1d +%Y-%m-%d >/dev/null 2>&1; then
+            # BSD date
+            _start=$(date -v-${_days_to_monday}d +%Y-%m-%d)
+            _end=$(date -v+${_days_to_sunday}d +%Y-%m-%d)
+        else
+            # GNU date
+            _start=$(date -d "-${_days_to_monday} days" +%Y-%m-%d)
+            _end=$(date -d "+${_days_to_sunday} days" +%Y-%m-%d)
+        fi
+    else
+        # Default: next N days
+        _start=$(date +%Y-%m-%d)
+        
+        # BSD date (macOS) vs GNU date (Linux)
+        if date -v+1d +%Y-%m-%d >/dev/null 2>&1; then
+            # BSD date
+            _end=$(date -v+"${_days}"d +%Y-%m-%d)
+        else
+            # GNU date
+            _end=$(date -d "+${_days} days" +%Y-%m-%d)
+        fi
+    fi
+    
+    # Collect calendar data
+    _sonarr_data="[]"
+    _radarr_data="[]"
+    
+    if [ "$_sonarr" -eq 1 ]; then
+        # Load sonarr config and fetch calendar
+        if load_config "sonarr" 2>/dev/null; then
+            # shellcheck disable=SC1090,SC1091
+            . "${LIB_DIR}/sonarr.sh"
+            _sonarr_data="$(sonarr_calendar_raw "$_start" "$_end" 2>/dev/null || echo "[]")"
+        fi
+    fi
+    
+    if [ "$_radarr" -eq 1 ]; then
+        # Load radarr config and fetch calendar
+        if load_config "radarr" 2>/dev/null; then
+            # shellcheck disable=SC1090,SC1091
+            . "${LIB_DIR}/radarr.sh"
+            _radarr_data="$(radarr_calendar_raw "$_start" "$_end" 2>/dev/null || echo "[]")"
+        fi
+    fi
+    
+    # Merge and sort results
+    _merged=$(printf '%s\n%s' "$_sonarr_data" "$_radarr_data" | jq -s 'add | sort_by(.date)')
+    
+    # Check if empty
+    _count=$(printf '%s' "$_merged" | jq 'length')
+    if [ "$_count" -eq 0 ]; then
+        info "No releases in this period ($_start to $_end)"
+        return 0
+    fi
+    
+    # Determine output format
+    _use_table=0
+    case "$_format" in
+        table) _use_table=1 ;;
+        auto) [ -t 1 ] && _use_table=1 ;;
+    esac
+    
+    if [ "$_use_table" -eq 1 ]; then
+        # Print table header
+        printf '%s\t%s\t%s\t%s\n' "Date" "Title" "Episode" "Service"
+        printf '%s\t%s\t%s\t%s\n' "----------" "--------------------" "---------------" "-------"
+        # Print rows
+        printf '%s' "$_merged" | jq -r '.[] | [.date, .title, .episode, .service] | @tsv'
+    else
+        # JSON output
+        printf '%s\n' "$_merged" | jq '.'
+    fi
+}
+
 show_help() {
     cat <<EOF
 arrctl - Unified CLI for managing *arr services
@@ -75,6 +240,7 @@ Commands:
     radarr      Manage Radarr (Movies)
     overseerr   Manage Overseerr (Requests)
     tautulli    View Plex activity (who is streaming)
+    calendar    Show upcoming releases (TV + Movies)
     update      Update arrctl to the latest version
 
 Options:
@@ -103,6 +269,8 @@ Examples:
     arrctl radarr add --id 603 --search
     arrctl overseerr pending
     arrctl tautulli now
+    arrctl calendar
+    arrctl calendar --days 14 --sonarr
 
 EOF
 }
@@ -127,6 +295,10 @@ main() {
         update)
             shift
             arrctl_update "$@"
+            ;;
+        calendar)
+            shift
+            arrctl_calendar "$@"
             ;;
         sonarr|radarr|overseerr|tautulli)
             SERVICE="$1"
