@@ -487,9 +487,10 @@ sonarr_calendar() {
     _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
     
     # Format output - transform to unified format with date, title, episode, service
+    # Note: Sonarr calendar API returns seriesId but not series title
     printf '%s' "$_response" | jq '[.[] | {
         date: (.airDateUtc | split("T")[0]),
-        title: .series.title,
+        title: ("Series ID: " + (.seriesId | tostring)),
         episode: ("S" + (if .seasonNumber < 10 then "0" else "" end) + (.seasonNumber | tostring) + "E" + (if .episodeNumber < 10 then "0" else "" end) + (.episodeNumber | tostring) + " - " + .title),
         service: "Sonarr"
     }]'
@@ -506,9 +507,10 @@ sonarr_calendar_raw() {
     _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
     
     # Transform to unified format
+    # Note: Sonarr calendar API returns seriesId but not series title
     printf '%s' "$_response" | jq '[.[] | {
         date: (.airDateUtc | split("T")[0]),
-        title: .series.title,
+        title: ("Series ID: " + (.seriesId | tostring)),
         episode: ("S" + (if .seasonNumber < 10 then "0" else "" end) + (.seasonNumber | tostring) + "E" + (if .episodeNumber < 10 then "0" else "" end) + (.episodeNumber | tostring) + " - " + .title),
         service: "Sonarr"
     }]'
