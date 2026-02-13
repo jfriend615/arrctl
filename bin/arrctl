@@ -4,9 +4,21 @@
 
 set -e
 
-# Resolve script directory (works with symlinks)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB_DIR="$(cd "${SCRIPT_DIR}/../lib" && pwd)"
+# Resolve script directory (follows symlinks)
+resolve_link() {
+    TARGET="$1"
+    cd "$(dirname "$TARGET")"
+    TARGET=$(basename "$TARGET")
+    # Follow symlinks
+    while [ -L "$TARGET" ]; do
+        TARGET=$(readlink "$TARGET")
+        cd "$(dirname "$TARGET")"
+        TARGET=$(basename "$TARGET")
+    done
+    pwd -P
+}
+SCRIPT_DIR="$(resolve_link "$0")"
+LIB_DIR="${SCRIPT_DIR}/../lib"
 
 # Source common utilities
 # shellcheck source=lib/common.sh
