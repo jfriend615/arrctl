@@ -108,6 +108,8 @@ test_case "arrctl tautulli --help works" "$ARRCTL" tautulli --help
 test_case "arrctl tautulli help works" "$ARRCTL" tautulli help
 test_case "arrctl overseerr --help works" "$ARRCTL" overseerr --help
 test_case "arrctl overseerr help works" "$ARRCTL" overseerr help
+test_case "arrctl calendar --help works" "$ARRCTL" calendar --help
+test_case "arrctl calendar help works" "$ARRCTL" calendar help
 
 # Invalid command handling
 printf '\n%s\n' "--- Error Handling ---"
@@ -149,6 +151,12 @@ else
     fail "Main help mentions update"
 fi
 
+if "$ARRCTL" --help 2>&1 | grep -q "calendar"; then
+    pass "Main help mentions calendar"
+else
+    fail "Main help mentions calendar"
+fi
+
 if "$ARRCTL" sonarr --help 2>&1 | grep -q "list"; then
     pass "Sonarr help mentions list"
 else
@@ -167,6 +175,12 @@ else
     fail "Sonarr help mentions add"
 fi
 
+if "$ARRCTL" sonarr --help 2>&1 | grep -q "calendar"; then
+    pass "Sonarr help mentions calendar"
+else
+    fail "Sonarr help mentions calendar"
+fi
+
 if "$ARRCTL" radarr --help 2>&1 | grep -q "list"; then
     pass "Radarr help mentions list"
 else
@@ -183,6 +197,24 @@ if "$ARRCTL" radarr --help 2>&1 | grep -q "add"; then
     pass "Radarr help mentions add"
 else
     fail "Radarr help mentions add"
+fi
+
+if "$ARRCTL" radarr --help 2>&1 | grep -q "calendar"; then
+    pass "Radarr help mentions calendar"
+else
+    fail "Radarr help mentions calendar"
+fi
+
+if "$ARRCTL" calendar --help 2>&1 | grep -q "days"; then
+    pass "Calendar help mentions days"
+else
+    fail "Calendar help mentions days"
+fi
+
+if "$ARRCTL" calendar --help 2>&1 | grep -q "week"; then
+    pass "Calendar help mentions week"
+else
+    fail "Calendar help mentions week"
 fi
 
 if "$ARRCTL" tautulli --help 2>&1 | grep -q "now"; then
