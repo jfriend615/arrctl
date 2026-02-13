@@ -55,6 +55,7 @@ Examples:
     arrctl radarr list --monitored
     arrctl radarr search "The Matrix"
     arrctl radarr add --id 603 --search
+    arrctl overseerr pending
     arrctl tautulli now
 
 EOF
