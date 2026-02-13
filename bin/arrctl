@@ -218,11 +218,8 @@ arrctl_calendar() {
     esac
     
     if [ "$_use_table" -eq 1 ]; then
-        # Print table header
-        printf '%s\t%s\t%s\t%s\n' "Date" "Title" "Episode" "Service"
-        printf '%s\t%s\t%s\t%s\n' "----------" "--------------------" "---------------" "-------"
-        # Print rows
-        printf '%s' "$_merged" | jq -r '.[] | [.date, .title, .episode, .service] | @tsv'
+        # Use format_table for aligned output
+        printf '%s' "$_merged" | format_table "Date|Title|Episode|Service" '.[] | [.date, .title, .episode, .service]'
     else
         # JSON output
         printf '%s\n' "$_merged" | jq '.'
