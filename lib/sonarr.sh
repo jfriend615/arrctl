@@ -483,14 +483,17 @@ sonarr_calendar() {
         _end=$(date -v+"${_days}"d +%Y-%m-%d 2>/dev/null || date -d "+${_days} days" +%Y-%m-%d)
     fi
     
+    # Fetch all series for title lookup (in-memory cache)
+    _series_list="$(api_request GET "/api/v3/series")"
+    _series_lookup="$(printf '%s' "$_series_list" | jq 'map({(.id | tostring): .title}) | add // {}')"
+    
     # Fetch calendar data
     _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
     
     # Format output - transform to unified format with date, title, episode, service
-    # Note: Sonarr calendar API returns seriesId but not series title
-    printf '%s' "$_response" | jq '[.[] | {
+    printf '%s' "$_response" | jq --argjson lookup "$_series_lookup" '[.[] | {
         date: (.airDateUtc | split("T")[0]),
-        title: ("Series ID: " + (.seriesId | tostring)),
+        title: ($lookup[(.seriesId | tostring)] // "Unknown Series"),
         episode: ("S" + (if .seasonNumber < 10 then "0" else "" end) + (.seasonNumber | tostring) + "E" + (if .episodeNumber < 10 then "0" else "" end) + (.episodeNumber | tostring) + " - " + .title),
         service: "Sonarr"
     }]'
@@ -503,14 +506,17 @@ sonarr_calendar_raw() {
     _start="$1"
     _end="$2"
     
+    # Fetch all series for title lookup (in-memory cache)
+    _series_list="$(api_request GET "/api/v3/series")"
+    _series_lookup="$(printf '%s' "$_series_list" | jq 'map({(.id | tostring): .title}) | add // {}')"
+    
     # Fetch calendar data
     _response="$(api_request GET "/api/v3/calendar?start=${_start}&end=${_end}")"
     
-    # Transform to unified format
-    # Note: Sonarr calendar API returns seriesId but not series title
-    printf '%s' "$_response" | jq '[.[] | {
+    # Transform to unified format with series title lookup
+    printf '%s' "$_response" | jq --argjson lookup "$_series_lookup" '[.[] | {
         date: (.airDateUtc | split("T")[0]),
-        title: ("Series ID: " + (.seriesId | tostring)),
+        title: ($lookup[(.seriesId | tostring)] // "Unknown Series"),
         episode: ("S" + (if .seasonNumber < 10 then "0" else "" end) + (.seasonNumber | tostring) + "E" + (if .episodeNumber < 10 then "0" else "" end) + (.episodeNumber | tostring) + " - " + .title),
         service: "Sonarr"
     }]'
