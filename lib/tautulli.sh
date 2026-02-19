@@ -265,7 +265,8 @@ tautulli_stale() {
             return 2
         fi
 
-        _items="$(printf '%s' "$_media_response" | jq '.response.data.data // []')"
+        _section_name="$(printf '%s' "$_selected_libraries" | jq -r --arg sid "$_section_id" '.[] | select((.section_id|tostring)==$sid) | .section_name' | head -n1)"
+        _items="$(printf '%s' "$_media_response" | jq --arg lib_name "${_section_name:-Unknown}" '.response.data.data // [] | map(.library_name = (.library_name // .section_name // $lib_name // "Unknown"))')"
         _all_items="$(printf '%s\n%s\n' "$_all_items" "$_items" | jq -s 'add')"
     done
 
@@ -279,9 +280,10 @@ tautulli_stale() {
         --argjson min_size "$_min_size_bytes" \
         --argjson limit "$_limit" '
         [ .[]
-          | .file_size = ((.file_size // 0) | tonumber)
-          | .play_count = ((.play_count // 0) | tonumber)
-          | .last_played = ((.last_played // 0) | tonumber)
+          | .file_size = (try ((.file_size // 0) | tonumber) catch 0)
+          | .play_count = (try ((.play_count // 0) | tonumber) catch 0)
+          | .last_played = (try ((.last_played // 0) | tonumber) catch 0)
+          | .added_at = (try ((.added_at // 0) | tonumber) catch 0)
           | .days_since_last_played = (if .last_played > 0 then ((($now - .last_played) / 86400) | floor) else 999999 end)
           | .size_gb = ((.file_size / 1073741824) * 100 | floor) / 100
           | select(.file_size >= $min_size)
@@ -305,17 +307,21 @@ tautulli_stale() {
         auto) [ -t 1 ] && _use_table=1 ;;
     esac
 
-    printf '%s\n' "$_result_json" | format_table \
-        "Library|Type|Title|Size(GB)|Plays|Days Since|Last Played" \
-        '.[] | [
-            (.library_name // "Unknown"),
-            (.media_type // "unknown"),
-            (.title // .sort_title // "Unknown"),
-            (.size_gb | tostring),
-            (.play_count | tostring),
-            (.days_since_last_played | tostring),
-            (if (.last_played // 0) > 0 then (.last_played | strftime("%Y-%m-%d")) else "Never" end)
-        ]'
+    if [ "$_use_table" -eq 1 ]; then
+        printf '%s\n' "$_result_json" | format_table \
+            "Library|Type|Title|Size(GB)|Plays|Last Played|Date Added" \
+            '.[] | [
+                (.library_name // "Unknown"),
+                (.media_type // "unknown"),
+                (.title // .sort_title // "Unknown"),
+                (.size_gb | tostring),
+                (.play_count | tostring),
+                (if (.last_played // 0) > 0 then (.last_played | strftime("%Y-%m-%d")) else "Never" end),
+                (if (.added_at // 0) > 0 then (.added_at | strftime("%Y-%m-%d")) else "Unknown" end)
+            ]'
+    else
+        printf '%s\n' "$_result_json" | jq '.'
+    fi
 
     if [ "$_use_table" -eq 1 ]; then
         _total_gb="$(printf '%s' "$_result_json" | jq '[.[].file_size] | add // 0 | . / 1073741824')"
