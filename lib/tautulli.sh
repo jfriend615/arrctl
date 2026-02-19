@@ -299,39 +299,28 @@ tautulli_stale() {
         return 1
     fi
 
-    if [ "$OUTPUT_FORMAT" = "json" ]; then
-        printf '%s\n' "$_result_json" | jq '.'
-        return 0
-    fi
+    _use_table=0
+    case "$OUTPUT_FORMAT" in
+        table) _use_table=1 ;;
+        auto) [ -t 1 ] && _use_table=1 ;;
+    esac
 
-    if command -v column >/dev/null 2>&1; then
-        {
-            printf '%s\n' "Library|Type|Title|Size(GB)|Plays|Days Since|Last Played"
-            printf '%s\n' "$_result_json" | jq -r '.[] | [
-                (.library_name // "Unknown"),
-                (.media_type // "unknown"),
-                (.title // .sort_title // "Unknown"),
-                ((.size_gb|tostring)),
-                ((.play_count|tostring)),
-                ((.days_since_last_played|tostring)),
-                (if (.last_played // 0) > 0 then (.last_played | strftime("%Y-%m-%d")) else "Never" end)
-            ] | join("|")'
-        } | column -t -s '|'
-    else
-        printf '%s\n' "Library\tType\tTitle\tSize(GB)\tPlays\tDays Since\tLast Played"
-        printf '%s\n' "$_result_json" | jq -r '.[] | [
+    printf '%s\n' "$_result_json" | format_table \
+        "Library|Type|Title|Size(GB)|Plays|Days Since|Last Played" \
+        '.[] | [
             (.library_name // "Unknown"),
             (.media_type // "unknown"),
             (.title // .sort_title // "Unknown"),
-            ((.size_gb|tostring)),
-            ((.play_count|tostring)),
-            ((.days_since_last_played|tostring)),
+            (.size_gb | tostring),
+            (.play_count | tostring),
+            (.days_since_last_played | tostring),
             (if (.last_played // 0) > 0 then (.last_played | strftime("%Y-%m-%d")) else "Never" end)
-        ] | @tsv'
-    fi
+        ]'
 
-    _total_gb="$(printf '%s' "$_result_json" | jq '[.[].file_size] | add // 0 | . / 1073741824')"
-    info "$_count stale candidate(s) | total size: $(printf '%.2f' "$_total_gb") GiB"
+    if [ "$_use_table" -eq 1 ]; then
+        _total_gb="$(printf '%s' "$_result_json" | jq '[.[].file_size] | add // 0 | . / 1073741824')"
+        info "$_count stale candidate(s) | total size: $(printf '%.2f' "$_total_gb") GiB"
+    fi
 
     return 0
 }
