@@ -266,6 +266,7 @@ Examples:
     arrctl radarr add --id 603 --search
     arrctl overseerr pending
     arrctl tautulli now
+    arrctl tautulli stale --library Movies --min-days 365 --max-plays 1
     arrctl calendar
     arrctl calendar --days 14 --sonarr
 
