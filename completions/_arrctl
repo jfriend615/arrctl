@@ -42,19 +42,10 @@ _arrctl() {
           _arrctl_tautulli
           ;;
         calendar)
-          _arguments \
-            '--days=[Show next N days]:days:' \
-            '--week[Show current week]' \
-            '--sonarr[Show TV episodes only]' \
-            '--radarr[Show movies only]' \
-            '--format=[Output format]:format:(json table auto)' \
-            '(-h --help)'{-h,--help}'[Show help]'
+          _arrctl_calendar
           ;;
         completion)
-          _arguments \
-            '--install[Install completion for active shell]' \
-            '--shell=[Shell type]:shell:(bash zsh)' \
-            '(-h --help)'{-h,--help}'[Show help]'
+          _arrctl_completion
           ;;
       esac
       ;;
@@ -71,46 +62,60 @@ _arrctl_sonarr() {
     'help:Show help'
   )
 
-  if (( CURRENT == 2 )); then
-    _describe -t commands 'sonarr command' subcmds
-    return
-  fi
+  _arguments -C \
+    '1:command:->command' \
+    '*::arg:->args'
 
-  case "$words[2]" in
-    list)
-      _arguments \
-        '--monitored[Only monitored series]' \
-        '--unmonitored[Only unmonitored series]' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
-        '(-h --help)'{-h,--help}'[Show help]'
+  case $state in
+    command)
+      _describe -t commands 'sonarr command' subcmds
       ;;
-    search)
-      _arguments \
-        '--limit=[Limit results]:count:' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-h --help)'{-h,--help}'[Show help]' \
-        '*:search term:'
-      ;;
-    add)
-      _arguments \
-        '--id=[TVDB ID]:id:' \
-        '--quality=[Quality profile]:profile:' \
-        '--root=[Root folder path]:path:_files -/' \
-        '--search[Search after add]' \
-        '--monitored[Monitor series]' \
-        '--no-monitored[Do not monitor series]' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
-        '(-h --help)'{-h,--help}'[Show help]'
-      ;;
-    calendar)
-      _arguments \
-        '--days=[Show next N days]:days:' \
-        '--start=[Start date YYYY-MM-DD]:date:' \
-        '--end=[End date YYYY-MM-DD]:date:' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-h --help)'{-h,--help}'[Show help]'
+    args)
+      case $words[1] in
+        list)
+          _arguments \
+            '--monitored[Only monitored series]' \
+            '--unmonitored[Only unmonitored series]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        search)
+          _arguments \
+            '--query=[Search query]:query:' \
+            '--limit=[Limit results]:count:' \
+            '--monitored[Only monitored series]' \
+            '--unmonitored[Only unmonitored series]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        add)
+          _arguments \
+            '--id=[TVDB ID]:id:' \
+            '--query=[Search query]:query:' \
+            '--quality=[Quality profile]:profile:' \
+            '--root=[Root folder path]:path:_files -/' \
+            '--search[Search after add]' \
+            '--monitored[Monitor series]' \
+            '--no-monitored[Do not monitor series]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        calendar)
+          _arguments \
+            '--days=[Show next N days]:days:' \
+            '--monitored[Only monitored series]' \
+            '--start=[Start date YYYY-MM-DD]:date:' \
+            '--end=[End date YYYY-MM-DD]:date:' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        help)
+          _arguments \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+      esac
       ;;
   esac
 }
@@ -125,46 +130,60 @@ _arrctl_radarr() {
     'help:Show help'
   )
 
-  if (( CURRENT == 2 )); then
-    _describe -t commands 'radarr command' subcmds
-    return
-  fi
+  _arguments -C \
+    '1:command:->command' \
+    '*::arg:->args'
 
-  case "$words[2]" in
-    list)
-      _arguments \
-        '--monitored[Only monitored movies]' \
-        '--unmonitored[Only unmonitored movies]' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
-        '(-h --help)'{-h,--help}'[Show help]'
+  case $state in
+    command)
+      _describe -t commands 'radarr command' subcmds
       ;;
-    search)
-      _arguments \
-        '--limit=[Limit results]:count:' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-h --help)'{-h,--help}'[Show help]' \
-        '*:search term:'
-      ;;
-    add)
-      _arguments \
-        '--id=[TMDb ID]:id:' \
-        '--quality=[Quality profile]:profile:' \
-        '--root=[Root folder path]:path:_files -/' \
-        '--search[Search after add]' \
-        '--monitored[Monitor movie]' \
-        '--no-monitored[Do not monitor movie]' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
-        '(-h --help)'{-h,--help}'[Show help]'
-      ;;
-    calendar)
-      _arguments \
-        '--days=[Show next N days]:days:' \
-        '--start=[Start date YYYY-MM-DD]:date:' \
-        '--end=[End date YYYY-MM-DD]:date:' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-h --help)'{-h,--help}'[Show help]'
+    args)
+      case $words[1] in
+        list)
+          _arguments \
+            '--monitored[Only monitored movies]' \
+            '--unmonitored[Only unmonitored movies]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        search)
+          _arguments \
+            '--query=[Search query]:query:' \
+            '--limit=[Limit results]:count:' \
+            '--monitored[Only monitored movies]' \
+            '--unmonitored[Only unmonitored movies]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        add)
+          _arguments \
+            '--id=[TMDb ID]:id:' \
+            '--query=[Search query]:query:' \
+            '--quality=[Quality profile]:profile:' \
+            '--root=[Root folder path]:path:_files -/' \
+            '--search[Search after add]' \
+            '--monitored[Monitor movie]' \
+            '--no-monitored[Do not monitor movie]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        calendar)
+          _arguments \
+            '--days=[Show next N days]:days:' \
+            '--monitored[Only monitored movies]' \
+            '--start=[Start date YYYY-MM-DD]:date:' \
+            '--end=[End date YYYY-MM-DD]:date:' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        help)
+          _arguments \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+      esac
       ;;
   esac
 }
@@ -179,20 +198,40 @@ _arrctl_overseerr() {
     'help:Show help'
   )
 
-  if (( CURRENT == 2 )); then
-    _describe -t commands 'overseerr command' subcmds
-    return
-  fi
+  _arguments -C \
+    '1:command:->command' \
+    '*::arg:->args'
 
-  case "$words[2]" in
-    pending)
-      _arguments '--format=[Output format]:format:(json table auto)' '(-h --help)'{-h,--help}'[Show help]'
+  case $state in
+    command)
+      _describe -t commands 'overseerr command' subcmds
       ;;
-    approve)
-      _arguments '--message=[Approval message]:message:' '--format=[Output format]:format:(json table auto)' '(-h --help)'{-h,--help}'[Show help]' '*:request id:'
-      ;;
-    deny|decline)
-      _arguments '--reason=[Denial reason]:reason:' '--format=[Output format]:format:(json table auto)' '(-h --help)'{-h,--help}'[Show help]' '*:request id:'
+    args)
+      case $words[1] in
+        pending)
+          _arguments \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        approve)
+          _arguments \
+            '--message=[Approval message]:message:' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]' \
+            '*:request id:'
+          ;;
+        deny|decline)
+          _arguments \
+            '--reason=[Denial reason]:reason:' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]' \
+            '*:request id:'
+          ;;
+        help)
+          _arguments \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+      esac
       ;;
   esac
 }
@@ -205,30 +244,57 @@ _arrctl_tautulli() {
     'help:Show help'
   )
 
-  if (( CURRENT == 2 )); then
-    _describe -t commands 'tautulli command' subcmds
-    return
-  fi
+  _arguments -C \
+    '1:command:->command' \
+    '*::arg:->args'
 
-  case "$words[2]" in
-    now)
-      _arguments \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
-        '(-h --help)'{-h,--help}'[Show help]'
+  case $state in
+    command)
+      _describe -t commands 'tautulli command' subcmds
       ;;
-    stale)
-      _arguments \
-        '--library=[Library name or section ID]:library:' \
-        '--min-days=[Minimum days]:days:' \
-        '--max-plays=[Maximum plays]:count:' \
-        '--min-size-gb=[Minimum size GiB]:size:' \
-        '--limit=[Limit results]:count:' \
-        '--json[JSON output]' \
-        '--format=[Output format]:format:(json table auto)' \
-        '(-h --help)'{-h,--help}'[Show help]'
+    args)
+      case $words[1] in
+        now)
+          _arguments \
+            '--quiet[Quiet output]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        stale)
+          _arguments \
+            '--library=[Library name or section ID]:library:' \
+            '--min-days=[Minimum days since last play]:days:' \
+            '--max-plays=[Maximum play count]:count:' \
+            '--min-size-gb=[Minimum size in GB]:size:' \
+            '--limit=[Limit results]:count:' \
+            '--format=[Output format]:format:(json table auto)' \
+            '--json[Output as JSON]' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        help)
+          _arguments \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+      esac
       ;;
   esac
+}
+
+_arrctl_calendar() {
+  _arguments \
+    '--days=[Show next N days]:days:' \
+    '--week[Show current week]' \
+    '--sonarr[Show TV episodes only]' \
+    '--radarr[Show movies only]' \
+    '--format=[Output format]:format:(json table auto)' \
+    '(-h --help)'{-h,--help}'[Show help]'
+}
+
+_arrctl_completion() {
+  _arguments \
+    '--install[Install completion for active shell]' \
+    '--shell=[Shell type]:shell:(bash zsh)' \
+    '(-h --help)'{-h,--help}'[Show help]'
 }
 
 _arrctl "$@"
