@@ -150,6 +150,9 @@ arrctl --help
 # Show version
 arrctl --version
 
+# Install shell completion (bash/zsh)
+arrctl completion --install
+
 # Sonarr (TV shows)
 arrctl sonarr list              # List all series
 arrctl sonarr search "Breaking Bad"
@@ -182,6 +185,10 @@ arrctl/
 │   ├── radarr.sh       # Radarr commands
 │   ├── overseerr.sh    # Overseerr commands
 │   └── tautulli.sh     # Tautulli commands
+├── completions/
+│   ├── arrctl.bash     # Bash completion
+│   ├── _arrctl         # Zsh completion
+│   └── install.sh      # Completion installer
 ├── config/
 │   └── config.json     # Config template
 ├── test/

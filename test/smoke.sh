@@ -78,7 +78,9 @@ if command -v shellcheck >/dev/null 2>&1; then
     test_case "shellcheck: lib/radarr.sh" shellcheck -s sh "${REPO_DIR}/lib/radarr.sh"
     test_case "shellcheck: lib/tautulli.sh" shellcheck -s sh "${REPO_DIR}/lib/tautulli.sh"
     test_case "shellcheck: lib/overseerr.sh" shellcheck -s sh "${REPO_DIR}/lib/overseerr.sh"
+    test_case "shellcheck: lib/completion.sh" shellcheck -s sh "${REPO_DIR}/lib/completion.sh"
     test_case "shellcheck: install.sh" shellcheck -s sh "${REPO_DIR}/install.sh"
+    test_case "shellcheck: completions/install.sh" shellcheck -s sh "${REPO_DIR}/completions/install.sh"
 else
     skip "shellcheck not installed"
 fi
@@ -90,7 +92,9 @@ if command -v dash >/dev/null 2>&1; then
     test_case "dash -n: lib/radarr.sh" dash -n "${REPO_DIR}/lib/radarr.sh"
     test_case "dash -n: lib/tautulli.sh" dash -n "${REPO_DIR}/lib/tautulli.sh"
     test_case "dash -n: lib/overseerr.sh" dash -n "${REPO_DIR}/lib/overseerr.sh"
+    test_case "dash -n: lib/completion.sh" dash -n "${REPO_DIR}/lib/completion.sh"
     test_case "dash -n: install.sh" dash -n "${REPO_DIR}/install.sh"
+    test_case "dash -n: completions/install.sh" dash -n "${REPO_DIR}/completions/install.sh"
 else
     skip "dash not installed"
 fi
@@ -99,7 +103,7 @@ fi
 printf '\n%s\n' "--- Help Commands ---"
 test_case "arrctl --help works" "$ARRCTL" --help
 test_case "arrctl --version works" "$ARRCTL" --version
-test_case "arrctl update works (in git repo)" "$ARRCTL" update
+skip "arrctl update test skipped (network-dependent)"
 test_case "arrctl sonarr --help works" "$ARRCTL" sonarr --help
 test_case "arrctl sonarr help works" "$ARRCTL" sonarr help
 test_case "arrctl radarr --help works" "$ARRCTL" radarr --help
@@ -110,6 +114,7 @@ test_case "arrctl overseerr --help works" "$ARRCTL" overseerr --help
 test_case "arrctl overseerr help works" "$ARRCTL" overseerr help
 test_case "arrctl calendar --help works" "$ARRCTL" calendar --help
 test_case "arrctl calendar help works" "$ARRCTL" calendar help
+test_case "arrctl completion --help works" "$ARRCTL" completion --help
 
 # Invalid command handling
 printf '\n%s\n' "--- Error Handling ---"
@@ -155,6 +160,12 @@ if "$ARRCTL" --help 2>&1 | grep -q "calendar"; then
     pass "Main help mentions calendar"
 else
     fail "Main help mentions calendar"
+fi
+
+if "$ARRCTL" --help 2>&1 | grep -q "completion"; then
+    pass "Main help mentions completion"
+else
+    fail "Main help mentions completion"
 fi
 
 if "$ARRCTL" sonarr --help 2>&1 | grep -q "list"; then
