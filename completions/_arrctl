@@ -53,6 +53,9 @@ _arrctl() {
 }
 
 _arrctl_sonarr() {
+  local context state line
+  typeset -A opt_args
+
   local -a subcmds
   subcmds=(
     'list:List all series'
@@ -116,6 +119,9 @@ _arrctl_sonarr() {
 }
 
 _arrctl_radarr() {
+  local context state line
+  typeset -A opt_args
+
   local -a subcmds
   subcmds=(
     'list:List all movies'
@@ -180,6 +186,9 @@ _arrctl_radarr() {
 }
 
 _arrctl_overseerr() {
+  local context state line
+  typeset -A opt_args
+
   local -a subcmds
   subcmds=(
     'pending:List pending requests'
@@ -228,6 +237,9 @@ _arrctl_overseerr() {
 }
 
 _arrctl_tautulli() {
+  local context state line
+  typeset -A opt_args
+
   local -a subcmds
   subcmds=(
     'now:Show active streams'
