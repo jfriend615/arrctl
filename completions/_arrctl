@@ -75,7 +75,6 @@ _arrctl_sonarr() {
         list)
           _arguments \
             '--monitored[Only monitored series]' \
-            '--unmonitored[Only unmonitored series]' \
             '--format=[Output format]:format:(json table auto)' \
             '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
             '(-h --help)'{-h,--help}'[Show help]'
@@ -139,7 +138,6 @@ _arrctl_radarr() {
         list)
           _arguments \
             '--monitored[Only monitored movies]' \
-            '--unmonitored[Only unmonitored movies]' \
             '--format=[Output format]:format:(json table auto)' \
             '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
             '(-h --help)'{-h,--help}'[Show help]'
@@ -147,6 +145,7 @@ _arrctl_radarr() {
         search)
           _arguments \
             '--limit=[Limit results]:count:' \
+            '--monitored[Only monitored movies]' \
             '--format=[Output format]:format:(json table auto)' \
             '(-h --help)'{-h,--help}'[Show help]' \
             '*:search term:'
