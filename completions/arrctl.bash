@@ -1,7 +1,15 @@
 # bash completion for arrctl
 
 _arrctl_completions() {
-    local cur prev words cword cmd subcmd
+    local cur prev cmd subcmd
+
+    _arrctl_set_reply() {
+        COMPREPLY=()
+        while IFS= read -r candidate; do
+            COMPREPLY+=("$candidate")
+        done < <(compgen -W "$1" -- "$cur")
+    }
+
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
@@ -17,87 +25,87 @@ _arrctl_completions() {
     subcmd="${COMP_WORDS[2]}"
 
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "sonarr radarr overseerr tautulli calendar completion update -h --help -v --version --config" -- "$cur") )
+        _arrctl_set_reply "sonarr radarr overseerr tautulli calendar completion update -h --help -v --version --config"
         return 0
     fi
 
     case "$cmd" in
         sonarr)
             if [[ $COMP_CWORD -eq 2 ]]; then
-                COMPREPLY=( $(compgen -W "list search add calendar help -h --help --config --format -q --quiet" -- "$cur") )
+                _arrctl_set_reply "list search add calendar help -h --help --config --format -q --quiet"
                 return 0
             fi
             case "$subcmd" in
                 list)
-                    COMPREPLY=( $(compgen -W "--monitored --unmonitored --format -q --quiet -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--monitored --unmonitored --format -q --quiet -h --help --config"
                     ;;
                 search)
-                    COMPREPLY=( $(compgen -W "--limit --format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--limit --format -h --help --config"
                     ;;
                 add)
-                    COMPREPLY=( $(compgen -W "--id --quality --root --search --monitored --no-monitored --format -q --quiet -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--id --quality --root --search --monitored --no-monitored --format -q --quiet -h --help --config"
                     ;;
                 calendar)
-                    COMPREPLY=( $(compgen -W "--days --start --end --format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--days --start --end --format -h --help --config"
                     ;;
             esac
             ;;
         radarr)
             if [[ $COMP_CWORD -eq 2 ]]; then
-                COMPREPLY=( $(compgen -W "list search add calendar help -h --help --config --format -q --quiet" -- "$cur") )
+                _arrctl_set_reply "list search add calendar help -h --help --config --format -q --quiet"
                 return 0
             fi
             case "$subcmd" in
                 list)
-                    COMPREPLY=( $(compgen -W "--monitored --unmonitored --format -q --quiet -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--monitored --unmonitored --format -q --quiet -h --help --config"
                     ;;
                 search)
-                    COMPREPLY=( $(compgen -W "--limit --format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--limit --format -h --help --config"
                     ;;
                 add)
-                    COMPREPLY=( $(compgen -W "--id --quality --root --search --monitored --no-monitored --format -q --quiet -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--id --quality --root --search --monitored --no-monitored --format -q --quiet -h --help --config"
                     ;;
                 calendar)
-                    COMPREPLY=( $(compgen -W "--days --start --end --format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--days --start --end --format -h --help --config"
                     ;;
             esac
             ;;
         overseerr)
             if [[ $COMP_CWORD -eq 2 ]]; then
-                COMPREPLY=( $(compgen -W "pending approve deny decline help -h --help --config --format" -- "$cur") )
+                _arrctl_set_reply "pending approve deny decline help -h --help --config --format"
                 return 0
             fi
             case "$subcmd" in
                 pending)
-                    COMPREPLY=( $(compgen -W "--format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--format -h --help --config"
                     ;;
                 approve)
-                    COMPREPLY=( $(compgen -W "--message --format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--message --format -h --help --config"
                     ;;
                 deny|decline)
-                    COMPREPLY=( $(compgen -W "--reason --format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--reason --format -h --help --config"
                     ;;
             esac
             ;;
         tautulli)
             if [[ $COMP_CWORD -eq 2 ]]; then
-                COMPREPLY=( $(compgen -W "now stale help -h --help --config --format -q --quiet" -- "$cur") )
+                _arrctl_set_reply "now stale help -h --help --config --format -q --quiet"
                 return 0
             fi
             case "$subcmd" in
                 now)
-                    COMPREPLY=( $(compgen -W "--format -q --quiet -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--format -q --quiet -h --help --config"
                     ;;
                 stale)
-                    COMPREPLY=( $(compgen -W "--library --min-days --max-plays --min-size-gb --limit --json --format -h --help --config" -- "$cur") )
+                    _arrctl_set_reply "--library --min-days --max-plays --min-size-gb --limit --json --format -h --help --config"
                     ;;
             esac
             ;;
         calendar)
-            COMPREPLY=( $(compgen -W "--days --week --sonarr --radarr --format -h --help --config" -- "$cur") )
+            _arrctl_set_reply "--days --week --sonarr --radarr --format -h --help --config"
             ;;
         completion)
-            COMPREPLY=( $(compgen -W "--install --shell bash zsh -h --help" -- "$cur") )
+            _arrctl_set_reply "--install --shell bash zsh -h --help"
             ;;
         update)
             COMPREPLY=()
