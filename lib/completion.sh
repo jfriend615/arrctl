@@ -84,6 +84,9 @@ fpath=("$_completion_file" \$fpath)
 if ! command -v compdef >/dev/null 2>&1; then
     autoload -Uz compinit
     compinit
+else
+    autoload -Uz _arrctl 2>/dev/null || true
+    compdef _arrctl arrctl 2>/dev/null || true
 fi
 # <<< arrctl completion <<<
 EOF
@@ -121,9 +124,19 @@ completion_install() {
     [ -f "$_source_completion_file" ] || die "Completion file not found: $_source_completion_file"
 
     if [ "$_shell" = "zsh" ]; then
+        _zsh_dir="$HOME/.zsh"
         _completion_dir="$(_zsh_completion_dir)"
-        mkdir -p "$_completion_dir"
+
+        mkdir -p "$_zsh_dir" "$_completion_dir"
+
+        # zsh compinit requires secure ownership/permissions for completion dirs
+        chown "$(id -u):$(id -g)" "$_zsh_dir" "$_completion_dir" 2>/dev/null || true
+        chmod 755 "$_zsh_dir" "$_completion_dir" 2>/dev/null || true
+
         cp "$_source_completion_file" "$_completion_dir/_arrctl"
+        chown "$(id -u):$(id -g)" "$_completion_dir/_arrctl" 2>/dev/null || true
+        chmod 644 "$_completion_dir/_arrctl" 2>/dev/null || true
+
         _profile_arg="$_completion_dir"
     else
         _profile_arg="$_source_completion_file"
