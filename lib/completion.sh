@@ -81,10 +81,8 @@ EOF
             cat <<EOF
 # >>> arrctl completion >>>
 fpath=("$_completion_file" \$fpath)
-if ! command -v compdef >/dev/null 2>&1; then
-    autoload -Uz compinit
-    compinit
-fi
+autoload -Uz compinit
+compinit
 # <<< arrctl completion <<<
 EOF
             ;;
