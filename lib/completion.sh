@@ -41,6 +41,10 @@ _completion_file_for_shell() {
     esac
 }
 
+_zsh_completion_dir() {
+    printf '%s/.zsh/completions' "$HOME"
+}
+
 _profile_for_shell() {
     case "$1" in
         bash)
@@ -76,8 +80,10 @@ EOF
         zsh)
             cat <<EOF
 # >>> arrctl completion >>>
-if [ -f "$_completion_file" ]; then
-    source "$_completion_file"
+fpath=("$_completion_file" \$fpath)
+if ! command -v compdef >/dev/null 2>&1; then
+    autoload -Uz compinit
+    compinit
 fi
 # <<< arrctl completion <<<
 EOF
@@ -109,12 +115,21 @@ _install_profile_block() {
 
 completion_install() {
     _shell="$(_detect_shell "${1:-}")"
-    _completion_file="$(_completion_file_for_shell "$_shell")"
+    _source_completion_file="$(_completion_file_for_shell "$_shell")"
     _profile="$(_profile_for_shell "$_shell")"
 
-    [ -f "$_completion_file" ] || die "Completion file not found: $_completion_file"
+    [ -f "$_source_completion_file" ] || die "Completion file not found: $_source_completion_file"
 
-    _block="$(_profile_block_for_shell "$_shell" "$_completion_file")"
+    if [ "$_shell" = "zsh" ]; then
+        _completion_dir="$(_zsh_completion_dir)"
+        mkdir -p "$_completion_dir"
+        cp "$_source_completion_file" "$_completion_dir/_arrctl"
+        _profile_arg="$_completion_dir"
+    else
+        _profile_arg="$_source_completion_file"
+    fi
+
+    _block="$(_profile_block_for_shell "$_shell" "$_profile_arg")"
     _install_profile_block "$_profile" "$_block"
 
     info "Installed $_shell completion in $_profile"
