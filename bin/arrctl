@@ -238,6 +238,7 @@ Commands:
     overseerr   Manage Overseerr (Requests)
     tautulli    View Plex activity (who is streaming)
     calendar    Show upcoming releases (TV + Movies)
+    completion  Manage shell completion scripts
     update      Update arrctl to the latest version
 
 Options:
@@ -269,6 +270,7 @@ Examples:
     arrctl tautulli stale --library Movies --min-days 365 --max-plays 1
     arrctl calendar
     arrctl calendar --days 14 --sonarr
+    arrctl completion --install
 
 EOF
 }
@@ -297,6 +299,17 @@ main() {
         calendar)
             shift
             arrctl_calendar "$@"
+            ;;
+        completion)
+            shift
+            if [ -f "${LIB_DIR}/completion.sh" ]; then
+                # shellcheck source=lib/completion.sh
+                # shellcheck disable=SC1090,SC1091
+                . "${LIB_DIR}/completion.sh"
+                completion_main "$@"
+            else
+                die "Completion support is not available in this installation."
+            fi
             ;;
         sonarr|radarr|overseerr|tautulli)
             SERVICE="$1"

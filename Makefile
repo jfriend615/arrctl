@@ -33,8 +33,9 @@ uninstall:
 	@echo "To remove config: rm -rf ~/.config/arrctl"
 
 test:
-	@chmod +x test/smoke.sh
+	@chmod +x test/smoke.sh test/completion.sh
 	@./test/smoke.sh
+	@./test/completion.sh
 
 lint:
 	@echo "Running shellcheck..."
