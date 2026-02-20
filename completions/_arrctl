@@ -71,12 +71,12 @@ _arrctl_sonarr() {
     'help:Show help'
   )
 
-  if (( CURRENT == 3 )); then
+  if (( CURRENT == 2 )); then
     _describe -t commands 'sonarr command' subcmds
     return
   fi
 
-  case "$words[3]" in
+  case "$words[2]" in
     list)
       _arguments \
         '--monitored[Only monitored series]' \
@@ -125,12 +125,12 @@ _arrctl_radarr() {
     'help:Show help'
   )
 
-  if (( CURRENT == 3 )); then
+  if (( CURRENT == 2 )); then
     _describe -t commands 'radarr command' subcmds
     return
   fi
 
-  case "$words[3]" in
+  case "$words[2]" in
     list)
       _arguments \
         '--monitored[Only monitored movies]' \
@@ -179,12 +179,12 @@ _arrctl_overseerr() {
     'help:Show help'
   )
 
-  if (( CURRENT == 3 )); then
+  if (( CURRENT == 2 )); then
     _describe -t commands 'overseerr command' subcmds
     return
   fi
 
-  case "$words[3]" in
+  case "$words[2]" in
     pending)
       _arguments '--format=[Output format]:format:(json table auto)' '(-h --help)'{-h,--help}'[Show help]'
       ;;
@@ -205,12 +205,12 @@ _arrctl_tautulli() {
     'help:Show help'
   )
 
-  if (( CURRENT == 3 )); then
+  if (( CURRENT == 2 )); then
     _describe -t commands 'tautulli command' subcmds
     return
   fi
 
-  case "$words[3]" in
+  case "$words[2]" in
     now)
       _arguments \
         '--format=[Output format]:format:(json table auto)' \
