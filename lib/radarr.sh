@@ -13,6 +13,8 @@ Commands:
     list              List all movies in library
     search <term>     Search for movies by name
     add               Add a movie to library
+    info              Show detailed movie information
+    delete            Delete a movie from library
     calendar          Show upcoming movie releases
 
 List Options:
@@ -33,6 +35,17 @@ Add Options:
     --monitored       Monitor the movie (default: true)
     --no-monitored    Don't monitor the movie
 
+Info Options:
+    --id ID           Radarr movie ID (exact match)
+    --name NAME       Movie name (partial match)
+    --format FORMAT   Output format: json|table|auto (default: auto)
+
+Delete Options:
+    --id ID           Radarr movie ID to delete (required)
+    --delete-files    Also delete movie files from disk
+    --add-exclusion   Add import list exclusion for this movie
+    --yes             Skip confirmation prompt
+
 Calendar Options:
     --days N          Show next N days (default: 7)
     --start DATE      Start date (YYYY-MM-DD)
@@ -44,7 +57,10 @@ Examples:
     arrctl radarr list --monitored --format table
     arrctl radarr search "The Matrix"
     arrctl radarr search "Dune" --limit 5
+    arrctl radarr info --name "Dune"
+    arrctl radarr info --id 100 --format json
     arrctl radarr add --id 603 --quality "HD-1080p" --search
+    arrctl radarr delete --id 100 --delete-files
     arrctl radarr calendar --days 30
 
 EOF
@@ -87,6 +103,14 @@ radarr_main() {
         add)
             shift
             radarr_add "$@"
+            ;;
+        info)
+            shift
+            radarr_info "$@"
+            ;;
+        delete)
+            shift
+            radarr_delete "$@"
             ;;
         calendar)
             shift
@@ -319,6 +343,190 @@ radarr_add() {
     # Output JSON if not in table mode
     if [ "$OUTPUT_FORMAT" = "json" ]; then
         printf '%s\n' "$_result" | jq '.'
+    fi
+}
+
+
+# Show detailed movie information
+radarr_info() {
+    _id=""
+    _name=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --id)
+                [ -n "${2:-}" ] || die "--id requires a movie ID"
+                _id="$2"
+                shift 2
+                ;;
+            --id=*)
+                _id="${1#--id=}"
+                shift
+                ;;
+            --name)
+                [ -n "${2:-}" ] || die "--name requires a value"
+                _name="$2"
+                shift 2
+                ;;
+            --name=*)
+                _name="${1#--name=}"
+                shift
+                ;;
+            -h|--help)
+                radarr_help
+                return 0
+                ;;
+            *)
+                die "Unknown option: $1"
+                ;;
+        esac
+    done
+
+    if [ -n "$_id" ] && [ -n "$_name" ]; then
+        die "Use either --id or --name, not both"
+    fi
+    if [ -z "$_id" ] && [ -z "$_name" ]; then
+        die "Either --id or --name is required"
+    fi
+
+    _movies_all="$(api_request GET "/api/v3/movie")"
+
+    if [ -n "$_id" ]; then
+        _movies="$(printf '%s' "$_movies_all" | jq --argjson id "$_id" '[.[] | select(.id == $id)]')"
+    else
+        _movies="$(printf '%s' "$_movies_all" | jq --arg name "$_name" '[.[] | select((.title // "") | ascii_downcase | contains($name | ascii_downcase))]')"
+    fi
+
+    _count="$(printf '%s' "$_movies" | jq 'length')"
+    [ "$_count" -gt 0 ] || die "No matching movie found"
+
+    _profiles="$(api_request GET "/api/v3/qualityprofile")"
+    _profile_lookup="$(printf '%s' "$_profiles" | jq 'map({(.id|tostring): .name}) | add // {}')"
+    _tags="$(api_request GET "/api/v3/tag")"
+    _tag_lookup="$(printf '%s' "$_tags" | jq 'map({(.id|tostring): .label}) | add // {}')"
+
+    _out='[]'
+    _idx=0
+    while [ "$_idx" -lt "$_count" ]; do
+        _one="$(printf '%s' "$_movies" | jq ".[${_idx}]")"
+
+        _movie_file_id="$(printf '%s' "$_one" | jq -r '.movieFile.id // .movieFileId // empty')"
+        _movie_file='null'
+        if [ -n "$_movie_file_id" ]; then
+            _movie_file="$(api_request GET "/api/v3/moviefile/${_movie_file_id}")"
+        fi
+
+        _enriched="$(printf '%s' "$_one" | jq \
+            --argjson profiles "$_profile_lookup" \
+            --argjson tags "$_tag_lookup" \
+            --argjson movieFile "$_movie_file" \
+            '{
+                id,
+                title,
+                year,
+                status,
+                monitored,
+                qualityProfileName: ($profiles[(.qualityProfileId|tostring)] // "Unknown"),
+                rootFolder: (.rootFolderPath // ""),
+                overview: (.overview // ""),
+                tags: ((.tags // []) | map($tags[(tostring)] // ("Tag-" + (tostring)))),
+                movieFile: ($movieFile // .movieFile // null)
+            }')"
+
+        _out="$(printf '%s\n%s' "$_out" "$_enriched" | jq -s '.[0] + [.[1]]')"
+        _idx=$((_idx + 1))
+    done
+
+    printf '%s' "$_out" | format_table \
+        "ID|Title|Year|Status|Monitored|Quality Profile|Root Folder|Tags|Movie File|Overview" \
+        '.[] | [
+            .id,
+            .title,
+            (.year // ""),
+            .status,
+            (if .monitored then "Yes" else "No" end),
+            .qualityProfileName,
+            .rootFolder,
+            ((.tags // []) | join(", ")),
+            (if (.movieFile // null) == null then "Not Downloaded" else ((.movieFile.relativePath // .movieFile.path // "") + " | " + (((.movieFile.size // 0) / (1024*1024*1024) | floor | tostring) + " GB") + " | " + (.movieFile.quality.quality.name // "Unknown")) end),
+            .overview
+        ]'
+}
+
+# Delete movie by ID
+radarr_delete() {
+    _id=""
+    _delete_files=false
+    _add_exclusion=false
+    _yes=false
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --id)
+                [ -n "${2:-}" ] || die "--id requires a movie ID"
+                _id="$2"
+                shift 2
+                ;;
+            --id=*)
+                _id="${1#--id=}"
+                shift
+                ;;
+            --delete-files)
+                _delete_files=true
+                shift
+                ;;
+            --add-exclusion)
+                _add_exclusion=true
+                shift
+                ;;
+            --yes)
+                _yes=true
+                shift
+                ;;
+            -h|--help)
+                radarr_help
+                return 0
+                ;;
+            *)
+                die "Unknown option: $1"
+                ;;
+        esac
+    done
+
+    [ -n "$_id" ] || die "--id is required. Usage: arrctl radarr delete --id <id>"
+
+    _movie="$(api_request GET "/api/v3/movie/${_id}")"
+    _title="$(printf '%s' "$_movie" | jq -r '.title // "Unknown"')"
+
+    if [ "$_yes" != "true" ]; then
+        printf 'Delete Radarr movie "%s" (ID: %s)? [y/N]: ' "$_title" "$_id" >&2
+        if [ -t 0 ]; then
+            read -r _confirm
+        else
+            read -r _confirm </dev/tty
+        fi
+        case "$_confirm" in
+            y|Y|yes|YES) ;;
+            *)
+                info "Cancelled"
+                return 0
+                ;;
+        esac
+    fi
+
+    _endpoint="/api/v3/movie/${_id}?deleteFiles=${_delete_files}&addImportListExclusion=${_add_exclusion}"
+    api_request DELETE "$_endpoint" >/dev/null
+
+    if [ "$OUTPUT_FORMAT" = "json" ]; then
+        jq -n \
+            --arg service "radarr" \
+            --argjson id "$_id" \
+            --arg title "$_title" \
+            --argjson deleteFiles "$_delete_files" \
+            --argjson addExclusion "$_add_exclusion" \
+            '{service: $service, deleted: true, id: $id, title: $title, deleteFiles: $deleteFiles, addImportListExclusion: $addExclusion}'
+    else
+        info "Deleted Radarr movie: $_title (ID: $_id)"
     fi
 }
 

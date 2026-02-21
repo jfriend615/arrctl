@@ -13,6 +13,8 @@ Commands:
     list              List all series in library
     search <term>     Search for series by name
     add               Add a series to library
+    info              Show detailed series information
+    delete            Delete a series from library
     calendar          Show upcoming episodes
 
 List Options:
@@ -33,6 +35,17 @@ Add Options:
     --monitored       Monitor the series (default: true)
     --no-monitored    Don't monitor the series
 
+Info Options:
+    --id ID           Sonarr series ID (exact match)
+    --name NAME       Series name (partial match)
+    --format FORMAT   Output format: json|table|auto (default: auto)
+
+Delete Options:
+    --id ID           Sonarr series ID to delete (required)
+    --delete-files    Also delete series files from disk
+    --add-exclusion   Add import list exclusion for this series
+    --yes             Skip confirmation prompt
+
 Calendar Options:
     --days N          Show next N days (default: 7)
     --start DATE      Start date (YYYY-MM-DD)
@@ -44,7 +57,10 @@ Examples:
     arrctl sonarr list --monitored --format table
     arrctl sonarr search "Breaking Bad"
     arrctl sonarr search "The Office" --limit 5
+    arrctl sonarr info --name "Severance"
+    arrctl sonarr info --id 42 --format json
     arrctl sonarr add --id 81189 --quality "HD-1080p" --search
+    arrctl sonarr delete --id 42 --delete-files
     arrctl sonarr calendar --days 14
 
 EOF
@@ -87,6 +103,14 @@ sonarr_main() {
         add)
             shift
             sonarr_add "$@"
+            ;;
+        info)
+            shift
+            sonarr_info "$@"
+            ;;
+        delete)
+            shift
+            sonarr_delete "$@"
             ;;
         calendar)
             shift
@@ -321,6 +345,194 @@ sonarr_add() {
     # Output JSON if not in table mode
     if [ "$OUTPUT_FORMAT" = "json" ]; then
         printf '%s\n' "$_result" | jq '.'
+    fi
+}
+
+
+# Show detailed series information
+sonarr_info() {
+    _id=""
+    _name=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --id)
+                [ -n "${2:-}" ] || die "--id requires a series ID"
+                _id="$2"
+                shift 2
+                ;;
+            --id=*)
+                _id="${1#--id=}"
+                shift
+                ;;
+            --name)
+                [ -n "${2:-}" ] || die "--name requires a value"
+                _name="$2"
+                shift 2
+                ;;
+            --name=*)
+                _name="${1#--name=}"
+                shift
+                ;;
+            -h|--help)
+                sonarr_help
+                return 0
+                ;;
+            *)
+                die "Unknown option: $1"
+                ;;
+        esac
+    done
+
+    if [ -n "$_id" ] && [ -n "$_name" ]; then
+        die "Use either --id or --name, not both"
+    fi
+    if [ -z "$_id" ] && [ -z "$_name" ]; then
+        die "Either --id or --name is required"
+    fi
+
+    _series_all="$(api_request GET "/api/v3/series")"
+
+    if [ -n "$_id" ]; then
+        _series="$(printf '%s' "$_series_all" | jq --argjson id "$_id" '[.[] | select(.id == $id)]')"
+    else
+        _series="$(printf '%s' "$_series_all" | jq --arg name "$_name" '[.[] | select((.title // "") | ascii_downcase | contains($name | ascii_downcase))]')"
+    fi
+
+    _count="$(printf '%s' "$_series" | jq 'length')"
+    [ "$_count" -gt 0 ] || die "No matching series found"
+
+    _profiles="$(api_request GET "/api/v3/qualityprofile")"
+    _profile_lookup="$(printf '%s' "$_profiles" | jq 'map({(.id|tostring): .name}) | add // {}')"
+    _tags="$(api_request GET "/api/v3/tag")"
+    _tag_lookup="$(printf '%s' "$_tags" | jq 'map({(.id|tostring): .label}) | add // {}')"
+
+    _out='[]'
+    _idx=0
+    while [ "$_idx" -lt "$_count" ]; do
+        _one="$(printf '%s' "$_series" | jq ".[${_idx}]")"
+        _series_id="$(printf '%s' "$_one" | jq -r '.id')"
+
+        _episodes="$(api_request GET "/api/v3/episode?seriesId=${_series_id}")"
+        _episode_count="$(printf '%s' "$_episodes" | jq 'length')"
+        _episode_files="$(api_request GET "/api/v3/episodefile?seriesId=${_series_id}")"
+
+        _enriched="$(printf '%s' "$_one" | jq \
+            --argjson profiles "$_profile_lookup" \
+            --argjson tags "$_tag_lookup" \
+            --argjson episodeCount "$_episode_count" \
+            --argjson episodeFiles "$_episode_files" \
+            '{
+                id,
+                title,
+                year,
+                status,
+                monitored,
+                qualityProfileName: ($profiles[(.qualityProfileId|tostring)] // "Unknown"),
+                rootFolder: (.rootFolderPath // ""),
+                overview: (.overview // ""),
+                tags: ((.tags // []) | map($tags[(tostring)] // ("Tag-" + (tostring)))),
+                seasonsCount: ((.seasons // []) | length),
+                episodesCount: $episodeCount,
+                episodeFiles: ($episodeFiles | map(.relativePath // .path // ("ID:" + (.id|tostring))))
+            }')"
+
+        _out="$(printf '%s\n%s' "$_out" "$_enriched" | jq -s '.[0] + [.[1]]')"
+        _idx=$((_idx + 1))
+    done
+
+    printf '%s' "$_out" | format_table \
+        "ID|Title|Year|Status|Monitored|Quality Profile|Root Folder|Seasons|Episodes|Tags|Episode Files|Overview" \
+        '.[] | [
+            .id,
+            .title,
+            (.year // ""),
+            .status,
+            (if .monitored then "Yes" else "No" end),
+            .qualityProfileName,
+            .rootFolder,
+            .seasonsCount,
+            .episodesCount,
+            ((.tags // []) | join(", ")),
+            ((.episodeFiles // []) | join(", ")),
+            .overview
+        ]'
+}
+
+# Delete series by ID
+sonarr_delete() {
+    _id=""
+    _delete_files=false
+    _add_exclusion=false
+    _yes=false
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --id)
+                [ -n "${2:-}" ] || die "--id requires a series ID"
+                _id="$2"
+                shift 2
+                ;;
+            --id=*)
+                _id="${1#--id=}"
+                shift
+                ;;
+            --delete-files)
+                _delete_files=true
+                shift
+                ;;
+            --add-exclusion)
+                _add_exclusion=true
+                shift
+                ;;
+            --yes)
+                _yes=true
+                shift
+                ;;
+            -h|--help)
+                sonarr_help
+                return 0
+                ;;
+            *)
+                die "Unknown option: $1"
+                ;;
+        esac
+    done
+
+    [ -n "$_id" ] || die "--id is required. Usage: arrctl sonarr delete --id <id>"
+
+    _series="$(api_request GET "/api/v3/series/${_id}")"
+    _title="$(printf '%s' "$_series" | jq -r '.title // "Unknown"')"
+
+    if [ "$_yes" != "true" ]; then
+        printf 'Delete Sonarr series "%s" (ID: %s)? [y/N]: ' "$_title" "$_id" >&2
+        if [ -t 0 ]; then
+            read -r _confirm
+        else
+            read -r _confirm </dev/tty
+        fi
+        case "$_confirm" in
+            y|Y|yes|YES) ;;
+            *)
+                info "Cancelled"
+                return 0
+                ;;
+        esac
+    fi
+
+    _endpoint="/api/v3/series/${_id}?deleteFiles=${_delete_files}&addImportListExclusion=${_add_exclusion}"
+    api_request DELETE "$_endpoint" >/dev/null
+
+    if [ "$OUTPUT_FORMAT" = "json" ]; then
+        jq -n \
+            --arg service "sonarr" \
+            --argjson id "$_id" \
+            --arg title "$_title" \
+            --argjson deleteFiles "$_delete_files" \
+            --argjson addExclusion "$_add_exclusion" \
+            '{service: $service, deleted: true, id: $id, title: $title, deleteFiles: $deleteFiles, addImportListExclusion: $addExclusion}'
+    else
+        info "Deleted Sonarr series: $_title (ID: $_id)"
     fi
 }
 
