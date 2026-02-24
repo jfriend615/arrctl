@@ -128,7 +128,7 @@ overseerr_pending() {
                     printf '%s\n' "ID|User|Title|Type|Date"
                     printf '%s\n' "$_results" | jq -c '.[]' | while IFS= read -r _req; do
                         _id="$(printf '%s' "$_req" | jq -r '.id')"
-                        _user="$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // .requestedBy.username // .requestedBy.plexUsername // .requestedBy.email // "Unknown"')"
+                        _user="$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // "Unknown"')"
                         _type="$(printf '%s' "$_req" | jq -r '.type // .media.mediaType // "unknown"')"
                         _tmdb_id="$(printf '%s' "$_req" | jq -r '.media.tmdbId // empty')"
                         _title="$(printf '%s' "$_req" | jq -r '.media.title // .media.name // .title // empty')"
@@ -143,7 +143,7 @@ overseerr_pending() {
                 printf '%s\n' "ID\tUser\tTitle\tType\tDate"
                 printf '%s\n' "$_results" | jq -c '.[]' | while IFS= read -r _req; do
                     _id="$(printf '%s' "$_req" | jq -r '.id')"
-                    _user="$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // .requestedBy.username // .requestedBy.plexUsername // .requestedBy.email // "Unknown"')"
+                    _user="$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // "Unknown"')"
                     _type="$(printf '%s' "$_req" | jq -r '.type // .media.mediaType // "unknown"')"
                     _tmdb_id="$(printf '%s' "$_req" | jq -r '.media.tmdbId // empty')"
                     _title="$(printf '%s' "$_req" | jq -r '.media.title // .media.name // .title // empty')"
@@ -165,7 +165,7 @@ overseerr_pending() {
                 fi
 
                 printf '%s' "$_req" | jq \
-                    --arg user "$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // .requestedBy.username // .requestedBy.plexUsername // .requestedBy.email // "Unknown"')" \
+                    --arg user "$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // "Unknown"')" \
                     --arg title "$_title" \
                     '. + {requestUser: $user, requestTitle: $title}'
             done | jq -s '.'
