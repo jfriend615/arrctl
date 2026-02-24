@@ -69,37 +69,107 @@ Examples:
 EOF
 }
 
+# Resolve request title from media type + TMDB id
+# Usage: overseerr_resolve_request_title <type> <tmdb_id>
+overseerr_resolve_request_title() {
+    _type="$1"
+    _tmdb_id="$2"
+
+    case "$_type" in
+        movie|tv) ;;
+        *)
+            printf 'Unknown'
+            return 0
+            ;;
+    esac
+
+    if [ -z "$_tmdb_id" ] || [ "$_tmdb_id" = "null" ]; then
+        printf 'Unknown'
+        return 0
+    fi
+
+    _detail="$(api_request GET "/api/v1/${_type}/${_tmdb_id}")"
+    printf '%s' "$_detail" | jq -r '.title // .name // "Unknown"'
+}
+
 # List pending requests
 # Usage: overseerr_pending
 overseerr_pending() {
     check_deps curl jq
-    
+
     _response="$(api_request GET "/api/v1/request?filter=pending&take=100")"
-    
+
     # Extract results array
     _results="$(printf '%s' "$_response" | jq '.results // []')"
     _count="$(printf '%s' "$_results" | jq 'length')"
-    
+
     # Handle no pending requests
     if [ "$_count" -eq 0 ]; then
         info "No pending requests"
         return 0
     fi
-    
+
     # Format output
     if [ "$OUTPUT_FORMAT" = "json" ]; then
         printf '%s\n' "$_results" | jq '.'
     else
         # Table format: ID, User, Title, Type, Date
-        printf '%s\n' "$_results" | format_table \
-            "ID|User|Title|Type|Date" \
-            '.[] | [
-                .id,
-                (.requestedBy.username // "Unknown"),
-                (.media.title // "Unknown"),
-                (.media.mediaType // "unknown"),
-                ((.createdAt // "") | split("T")[0])
-            ]'
+        # Note: request payload includes media identifiers but not a title,
+        # so we resolve titles from /movie/<tmdbId> or /tv/<tmdbId>.
+        _use_table=0
+        case "$OUTPUT_FORMAT" in
+            table) _use_table=1 ;;
+            auto) [ -t 1 ] && _use_table=1 ;;
+        esac
+
+        if [ "$_use_table" -eq 1 ]; then
+            if command -v column >/dev/null 2>&1; then
+                {
+                    printf '%s\n' "ID|User|Title|Type|Date"
+                    printf '%s\n' "$_results" | jq -c '.[]' | while IFS= read -r _req; do
+                        _id="$(printf '%s' "$_req" | jq -r '.id')"
+                        _user="$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // .requestedBy.username // .requestedBy.plexUsername // .requestedBy.email // "Unknown"')"
+                        _type="$(printf '%s' "$_req" | jq -r '.type // .media.mediaType // "unknown"')"
+                        _tmdb_id="$(printf '%s' "$_req" | jq -r '.media.tmdbId // empty')"
+                        _title="$(printf '%s' "$_req" | jq -r '.media.title // .media.name // .title // empty')"
+                        if [ -z "$_title" ] || [ "$_title" = "null" ]; then
+                            _title="$(overseerr_resolve_request_title "$_type" "$_tmdb_id")"
+                        fi
+                        _date="$(printf '%s' "$_req" | jq -r '(.createdAt // "") | split("T")[0]')"
+                        printf '%s|%s|%s|%s|%s\n' "$_id" "$_user" "$_title" "$_type" "$_date"
+                    done
+                } | column -t -s '|'
+            else
+                printf '%s\n' "ID\tUser\tTitle\tType\tDate"
+                printf '%s\n' "$_results" | jq -c '.[]' | while IFS= read -r _req; do
+                    _id="$(printf '%s' "$_req" | jq -r '.id')"
+                    _user="$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // .requestedBy.username // .requestedBy.plexUsername // .requestedBy.email // "Unknown"')"
+                    _type="$(printf '%s' "$_req" | jq -r '.type // .media.mediaType // "unknown"')"
+                    _tmdb_id="$(printf '%s' "$_req" | jq -r '.media.tmdbId // empty')"
+                    _title="$(printf '%s' "$_req" | jq -r '.media.title // .media.name // .title // empty')"
+                    if [ -z "$_title" ] || [ "$_title" = "null" ]; then
+                        _title="$(overseerr_resolve_request_title "$_type" "$_tmdb_id")"
+                    fi
+                    _date="$(printf '%s' "$_req" | jq -r '(.createdAt // "") | split("T")[0]')"
+                    printf '%s\t%s\t%s\t%s\t%s\n' "$_id" "$_user" "$_title" "$_type" "$_date"
+                done
+            fi
+        else
+            # Non-table fallback: emit structured JSON with resolved display fields.
+            printf '%s\n' "$_results" | jq -c '.[]' | while IFS= read -r _req; do
+                _type="$(printf '%s' "$_req" | jq -r '.type // .media.mediaType // "unknown"')"
+                _tmdb_id="$(printf '%s' "$_req" | jq -r '.media.tmdbId // empty')"
+                _title="$(printf '%s' "$_req" | jq -r '.media.title // .media.name // .title // empty')"
+                if [ -z "$_title" ] || [ "$_title" = "null" ]; then
+                    _title="$(overseerr_resolve_request_title "$_type" "$_tmdb_id")"
+                fi
+
+                printf '%s' "$_req" | jq \
+                    --arg user "$(printf '%s' "$_req" | jq -r '.requestedBy.displayName // .requestedBy.username // .requestedBy.plexUsername // .requestedBy.email // "Unknown"')" \
+                    --arg title "$_title" \
+                    '. + {requestUser: $user, requestTitle: $title}'
+            done | jq -s '.'
+        fi
     fi
 }
 
