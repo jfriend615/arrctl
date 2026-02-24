@@ -96,7 +96,14 @@ tautulli_now() {
     fi
 
     # Extract sessions from .response.data.sessions (wrapped response)
-    _sessions="$(printf '%s' "$_response" | jq '.response.data.sessions // []')"
+    # Normalize field aliases to avoid missing/undefined values across Tautulli versions/clients.
+    _sessions="$(printf '%s' "$_response" | jq '
+        .response.data.sessions // []
+        | map(. + {
+            user: (.user // .username // .friendly_name // .email // "Unknown"),
+            requested_title: (.requested_title // .full_title // .title // .grandparent_title // "Unknown")
+        })
+    ')"
     _count="$(printf '%s' "$_sessions" | jq 'length')"
 
     # Handle no active streams
@@ -116,12 +123,12 @@ tautulli_now() {
     if [ "$OUTPUT_FORMAT" = "json" ]; then
         printf '%s\n' "$_sessions" | jq '.'
     else
-        # Table format with fallback field names
+        # Table format uses normalized alias fields (user/requested_title)
         printf '%s\n' "$_sessions" | format_table \
             "User|Title|Progress|Quality|Transcode|State" \
             '.[] | [
-                (.user // .friendly_name // "Unknown"),
-                (.full_title // .title // "Unknown"),
+                (.user // "Unknown"),
+                (.requested_title // .full_title // .title // "Unknown"),
                 ((.progress_percent // 0 | tostring) + "%"),
                 (.video_full_resolution // .quality_profile // "Unknown"),
                 (.transcode_decision // "Unknown"),
