@@ -61,6 +61,8 @@ _arrctl_sonarr() {
     'list:List all series'
     'search:Search for series'
     'add:Add a series'
+    'info:Show detailed series information'
+    'delete:Delete a series from library'
     'calendar:Show upcoming episodes'
     'help:Show help'
   )
@@ -101,6 +103,22 @@ _arrctl_sonarr() {
             '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
             '(-h --help)'{-h,--help}'[Show help]'
           ;;
+        info)
+          _arguments \
+            '--id=[Sonarr series ID]:id:' \
+            '--name=[Series name]:name:' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        delete)
+          _arguments \
+            '--id=[Sonarr series ID]:id:' \
+            '--delete-files[Also delete files from disk]' \
+            '--add-exclusion[Add import list exclusion]' \
+            '--yes[Skip confirmation prompt]' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
         calendar)
           _arguments \
             '--days=[Show next N days]:days:' \
@@ -127,6 +145,8 @@ _arrctl_radarr() {
     'list:List all movies'
     'search:Search for movies'
     'add:Add a movie'
+    'info:Show detailed movie information'
+    'delete:Delete a movie from library'
     'calendar:Show upcoming releases'
     'help:Show help'
   )
@@ -166,6 +186,22 @@ _arrctl_radarr() {
             '--no-monitored[Do not monitor movie]' \
             '--format=[Output format]:format:(json table auto)' \
             '(-q --quiet)'{-q,--quiet}'[Quiet mode]' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        info)
+          _arguments \
+            '--id=[Radarr movie ID]:id:' \
+            '--name=[Movie name]:name:' \
+            '--format=[Output format]:format:(json table auto)' \
+            '(-h --help)'{-h,--help}'[Show help]'
+          ;;
+        delete)
+          _arguments \
+            '--id=[Radarr movie ID]:id:' \
+            '--delete-files[Also delete files from disk]' \
+            '--add-exclusion[Add import list exclusion]' \
+            '--yes[Skip confirmation prompt]' \
+            '--format=[Output format]:format:(json table auto)' \
             '(-h --help)'{-h,--help}'[Show help]'
           ;;
         calendar)

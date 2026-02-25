@@ -389,6 +389,12 @@ radarr_info() {
         die "Either --id or --name is required"
     fi
 
+    if [ -n "$_id" ]; then
+        case "$_id" in
+            *[!0-9]*|'') die "--id must be a numeric Radarr movie ID" ;;
+        esac
+    fi
+
     _movies_all="$(api_request GET "/api/v3/movie")"
 
     if [ -n "$_id" ]; then
@@ -494,6 +500,9 @@ radarr_delete() {
     done
 
     [ -n "$_id" ] || die "--id is required. Usage: arrctl radarr delete --id <id>"
+    case "$_id" in
+        *[!0-9]*|'') die "--id must be a numeric Radarr movie ID" ;;
+    esac
 
     _movie="$(api_request GET "/api/v3/movie/${_id}")"
     _title="$(printf '%s' "$_movie" | jq -r '.title // "Unknown"')"

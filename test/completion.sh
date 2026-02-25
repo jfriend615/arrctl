@@ -24,6 +24,22 @@ run_completion() {
 out="$(run_completion arrctl sonarr "")"
 echo "$out" | grep -qx "list" || fail "arrctl sonarr <tab> should include 'list'"
 echo "$out" | grep -qx "search" || fail "arrctl sonarr <tab> should include 'search'"
+echo "$out" | grep -qx "info" || fail "arrctl sonarr <tab> should include 'info'"
+echo "$out" | grep -qx "delete" || fail "arrctl sonarr <tab> should include 'delete'"
+
+out="$(run_completion arrctl sonarr delete --)"
+echo "$out" | grep -qx -- "--delete-files" || fail "arrctl sonarr delete --<tab> should include --delete-files"
+echo "$out" | grep -qx -- "--add-exclusion" || fail "arrctl sonarr delete --<tab> should include --add-exclusion"
+echo "$out" | grep -qx -- "--yes" || fail "arrctl sonarr delete --<tab> should include --yes"
+
+out="$(run_completion arrctl radarr "")"
+echo "$out" | grep -qx "info" || fail "arrctl radarr <tab> should include 'info'"
+echo "$out" | grep -qx "delete" || fail "arrctl radarr <tab> should include 'delete'"
+
+out="$(run_completion arrctl radarr delete --)"
+echo "$out" | grep -qx -- "--delete-files" || fail "arrctl radarr delete --<tab> should include --delete-files"
+echo "$out" | grep -qx -- "--add-exclusion" || fail "arrctl radarr delete --<tab> should include --add-exclusion"
+echo "$out" | grep -qx -- "--yes" || fail "arrctl radarr delete --<tab> should include --yes"
 
 out="$(run_completion arrctl tautulli stale --)"
 echo "$out" | grep -qx -- "--min-days" || fail "arrctl tautulli stale --<tab> should include --min-days"

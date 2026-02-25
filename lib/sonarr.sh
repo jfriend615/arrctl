@@ -391,6 +391,12 @@ sonarr_info() {
         die "Either --id or --name is required"
     fi
 
+    if [ -n "$_id" ]; then
+        case "$_id" in
+            *[!0-9]*|'') die "--id must be a numeric Sonarr series ID" ;;
+        esac
+    fi
+
     _series_all="$(api_request GET "/api/v3/series")"
 
     if [ -n "$_id" ]; then
@@ -500,6 +506,9 @@ sonarr_delete() {
     done
 
     [ -n "$_id" ] || die "--id is required. Usage: arrctl sonarr delete --id <id>"
+    case "$_id" in
+        *[!0-9]*|'') die "--id must be a numeric Sonarr series ID" ;;
+    esac
 
     _series="$(api_request GET "/api/v3/series/${_id}")"
     _title="$(printf '%s' "$_series" | jq -r '.title // "Unknown"')"

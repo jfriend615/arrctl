@@ -32,7 +32,7 @@ _arrctl_completions() {
     case "$cmd" in
         sonarr)
             if [[ $COMP_CWORD -eq 2 ]]; then
-                _arrctl_set_reply "list search add calendar help -h --help --config --format -q --quiet"
+                _arrctl_set_reply "list search add info delete calendar help -h --help --config --format -q --quiet"
                 return 0
             fi
             case "$subcmd" in
@@ -44,6 +44,12 @@ _arrctl_completions() {
                     ;;
                 add)
                     _arrctl_set_reply "--id --quality --root --search --monitored --no-monitored --format -q --quiet -h --help --config"
+                    ;;
+                info)
+                    _arrctl_set_reply "--id --name --format -h --help --config"
+                    ;;
+                delete)
+                    _arrctl_set_reply "--id --delete-files --add-exclusion --yes --format -h --help --config"
                     ;;
                 calendar)
                     _arrctl_set_reply "--days --start --end --format -h --help --config"
@@ -52,7 +58,7 @@ _arrctl_completions() {
             ;;
         radarr)
             if [[ $COMP_CWORD -eq 2 ]]; then
-                _arrctl_set_reply "list search add calendar help -h --help --config --format -q --quiet"
+                _arrctl_set_reply "list search add info delete calendar help -h --help --config --format -q --quiet"
                 return 0
             fi
             case "$subcmd" in
@@ -64,6 +70,12 @@ _arrctl_completions() {
                     ;;
                 add)
                     _arrctl_set_reply "--id --quality --root --search --monitored --no-monitored --format -q --quiet -h --help --config"
+                    ;;
+                info)
+                    _arrctl_set_reply "--id --name --format -h --help --config"
+                    ;;
+                delete)
+                    _arrctl_set_reply "--id --delete-files --add-exclusion --yes --format -h --help --config"
                     ;;
                 calendar)
                     _arrctl_set_reply "--days --start --end --format -h --help --config"

@@ -61,6 +61,27 @@ test_case_fail() {
     fi
 }
 
+# Run a test expecting failure with matching stderr text
+test_case_fail_contains() {
+    _name="$1"
+    _needle="$2"
+    shift 2
+
+    _tmp="$(mktemp)"
+    if "$@" > /dev/null 2>"$_tmp"; then
+        rm -f "$_tmp"
+        fail "$_name (expected failure)"
+        return
+    fi
+
+    if grep -q -- "$_needle" "$_tmp"; then
+        pass "$_name"
+    else
+        fail "$_name (missing expected error: $_needle)"
+    fi
+    rm -f "$_tmp"
+}
+
 printf '%s\n\n' "=== arrctl Smoke Tests ==="
 
 # Check dependencies
@@ -186,6 +207,18 @@ else
     fail "Sonarr help mentions add"
 fi
 
+if "$ARRCTL" sonarr --help 2>&1 | grep -q "info"; then
+    pass "Sonarr help mentions info"
+else
+    fail "Sonarr help mentions info"
+fi
+
+if "$ARRCTL" sonarr --help 2>&1 | grep -q "delete"; then
+    pass "Sonarr help mentions delete"
+else
+    fail "Sonarr help mentions delete"
+fi
+
 if "$ARRCTL" sonarr --help 2>&1 | grep -q "calendar"; then
     pass "Sonarr help mentions calendar"
 else
@@ -208,6 +241,18 @@ if "$ARRCTL" radarr --help 2>&1 | grep -q "add"; then
     pass "Radarr help mentions add"
 else
     fail "Radarr help mentions add"
+fi
+
+if "$ARRCTL" radarr --help 2>&1 | grep -q "info"; then
+    pass "Radarr help mentions info"
+else
+    fail "Radarr help mentions info"
+fi
+
+if "$ARRCTL" radarr --help 2>&1 | grep -q "delete"; then
+    pass "Radarr help mentions delete"
+else
+    fail "Radarr help mentions delete"
 fi
 
 if "$ARRCTL" radarr --help 2>&1 | grep -q "calendar"; then
@@ -251,6 +296,33 @@ if "$ARRCTL" overseerr --help 2>&1 | grep -q "deny"; then
 else
     fail "Overseerr help mentions deny"
 fi
+
+# Basic argument validation checks for new info/delete commands
+printf '\n%s\n' "--- Info/Delete Argument Validation ---"
+
+test_case_fail_contains "sonarr info missing selector fails" "Either --id or --name is required" \
+    env SONARR_URL="http://127.0.0.1" SONARR_API_KEY="test" "$ARRCTL" sonarr info
+
+test_case_fail_contains "sonarr info invalid --id fails" "--id must be a numeric Sonarr series ID" \
+    env SONARR_URL="http://127.0.0.1" SONARR_API_KEY="test" "$ARRCTL" sonarr info --id abc
+
+test_case_fail_contains "sonarr delete missing --id fails" "--id is required" \
+    env SONARR_URL="http://127.0.0.1" SONARR_API_KEY="test" "$ARRCTL" sonarr delete --yes
+
+test_case_fail_contains "sonarr delete invalid --id fails" "--id must be a numeric Sonarr series ID" \
+    env SONARR_URL="http://127.0.0.1" SONARR_API_KEY="test" "$ARRCTL" sonarr delete --id abc --yes
+
+test_case_fail_contains "radarr info missing selector fails" "Either --id or --name is required" \
+    env RADARR_URL="http://127.0.0.1" RADARR_API_KEY="test" "$ARRCTL" radarr info
+
+test_case_fail_contains "radarr info invalid --id fails" "--id must be a numeric Radarr movie ID" \
+    env RADARR_URL="http://127.0.0.1" RADARR_API_KEY="test" "$ARRCTL" radarr info --id abc
+
+test_case_fail_contains "radarr delete missing --id fails" "--id is required" \
+    env RADARR_URL="http://127.0.0.1" RADARR_API_KEY="test" "$ARRCTL" radarr delete --yes
+
+test_case_fail_contains "radarr delete invalid --id fails" "--id must be a numeric Radarr movie ID" \
+    env RADARR_URL="http://127.0.0.1" RADARR_API_KEY="test" "$ARRCTL" radarr delete --id abc --yes
 
 # Summary
 printf '\n%s\n' "=== Summary ==="
