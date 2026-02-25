@@ -59,7 +59,7 @@ profile="$TMP_HOME/.bash_profile"
 count="$(grep -c "# >>> arrctl completion >>>" "$profile" || true)"
 [ "$count" -eq 1 ] || fail "completion block should be added once (idempotent)"
 
-# Zsh install should use fpath + compinit pattern and copy completion file
+# Zsh install should use fpath + compinit pattern and symlink completion file
 TMP_HOME_ZSH="$(mktemp -d)"
 trap 'rm -rf "$TMP_HOME" "$TMP_HOME_ZSH"' EXIT
 
@@ -68,7 +68,10 @@ HOME="$TMP_HOME_ZSH" SHELL="/bin/zsh" "${REPO_DIR}/bin/arrctl" completion --inst
 
 zsh_profile="$TMP_HOME_ZSH/.zshrc"
 [ -f "$zsh_profile" ] || fail "completion install should create .zshrc for zsh"
-[ -f "$TMP_HOME_ZSH/.zsh/completions/_arrctl" ] || fail "zsh completion file should be copied into ~/.zsh/completions"
+[ -L "$TMP_HOME_ZSH/.zsh/completions/_arrctl" ] || fail "zsh completion file should be symlinked into ~/.zsh/completions"
+link_target="$(readlink "$TMP_HOME_ZSH/.zsh/completions/_arrctl")"
+resolved_target="$(cd "$(dirname "$link_target")" && pwd)/$(basename "$link_target")"
+[ "$resolved_target" = "$REPO_DIR/completions/_arrctl" ] || fail "zsh completion symlink should target repo completions/_arrctl"
 
 grep -q "fpath=(\"$TMP_HOME_ZSH/.zsh/completions\" \$fpath)" "$zsh_profile" || fail "zsh profile should add completion dir to fpath"
 grep -q 'autoload -Uz compinit' "$zsh_profile" || fail "zsh profile should autoload compinit"

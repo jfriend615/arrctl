@@ -111,6 +111,26 @@ _install_profile_block() {
     rm -f "$_tmp"
 }
 
+_link_completion_file() {
+    _source="$1"
+    _dest="$2"
+
+    if [ -L "$_dest" ]; then
+        _existing_target="$(readlink "$_dest" 2>/dev/null || true)"
+        if [ "$_existing_target" = "$_source" ]; then
+            return 0
+        fi
+    fi
+
+    if [ -e "$_dest" ] || [ -L "$_dest" ]; then
+        _backup="$_dest.bak.$(date +%Y%m%d%H%M%S)"
+        mv "$_dest" "$_backup"
+        warn "Backed up existing completion file to $_backup"
+    fi
+
+    ln -s "$_source" "$_dest"
+}
+
 completion_install() {
     _shell="$(_detect_shell "${1:-}")"
     _source_completion_file="$(_completion_file_for_shell "$_shell")"
@@ -120,8 +140,9 @@ completion_install() {
 
     if [ "$_shell" = "zsh" ]; then
         _completion_dir="$(_zsh_completion_dir)"
+        _zsh_target="$_completion_dir/_arrctl"
         mkdir -p "$_completion_dir"
-        cp "$_source_completion_file" "$_completion_dir/_arrctl"
+        _link_completion_file "$_source_completion_file" "$_zsh_target"
         _profile_arg="$_completion_dir"
     else
         _profile_arg="$_source_completion_file"
@@ -131,6 +152,9 @@ completion_install() {
     _install_profile_block "$_profile" "$_block"
 
     info "Installed $_shell completion in $_profile"
+    if [ "$_shell" = "zsh" ]; then
+        info "Linked zsh completion: $_zsh_target -> $_source_completion_file"
+    fi
     info "Run: source $_profile"
 }
 
