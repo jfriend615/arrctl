@@ -3,6 +3,8 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -125,10 +127,14 @@ func tautulliCmd() *cobra.Command {
 			if float64(size) < minSize*1073741824 || plays > maxPlays || days < minDays {
 				continue
 			}
+			sizeGB := math.Floor((float64(size)/1073741824)*100) / 100
+			staleScore := (sizeGB * 0.6) + (float64(days)/365.0)*0.3 + float64((maxPlays+1)-plays)*0.1
+			it["file_size"] = size
 			it["play_count"] = plays
 			it["last_played"] = last
 			it["days_since_last_played"] = days
-			it["size_gb"] = float64(size) / 1073741824
+			it["size_gb"] = sizeGB
+			it["stale_score"] = staleScore
 			if isNilish(it["section_name"]) {
 				it["section_name"] = firstNonEmpty(it["library_name"], "Unknown")
 			}
@@ -137,6 +143,17 @@ func tautulliCmd() *cobra.Command {
 			}
 			out = append(out, it)
 		}
+		sort.Slice(out, func(i, j int) bool {
+			si, sj := toFloat64(out[i]["stale_score"]), toFloat64(out[j]["stale_score"])
+			if si != sj {
+				return si > sj
+			}
+			fi, fj := toInt64(out[i]["file_size"]), toInt64(out[j]["file_size"])
+			if fi != fj {
+				return fi > fj
+			}
+			return toInt64(out[i]["last_played"]) < toInt64(out[j]["last_played"])
+		})
 		if len(out) > limit {
 			out = out[:limit]
 		}
@@ -193,4 +210,23 @@ func normalizeString(v any) string {
 		return ""
 	}
 	return s
+}
+
+func toFloat64(v any) float64 {
+	switch t := v.(type) {
+	case float64:
+		return t
+	case float32:
+		return float64(t)
+	case int64:
+		return float64(t)
+	case int:
+		return float64(t)
+	case string:
+		f := 0.0
+		fmt.Sscanf(t, "%f", &f)
+		return f
+	default:
+		return float64(toInt64(v))
+	}
 }
