@@ -87,6 +87,7 @@ func tautulliCmd() *cobra.Command {
 		}
 		items := []map[string]any{}
 		for _, li := range selected {
+			libraryName := firstNonEmpty(li["section_name"], "Unknown")
 			var mresp struct {
 				Response struct {
 					Result, Message string
@@ -101,7 +102,15 @@ func tautulliCmd() *cobra.Command {
 			if mresp.Response.Result != "success" {
 				return exitErr(2, errors.New(mresp.Response.Message))
 			}
-			items = append(items, mresp.Response.Data.Data...)
+			for _, it := range mresp.Response.Data.Data {
+				if isNilish(it["library_name"]) {
+					it["library_name"] = libraryName
+				}
+				if isNilish(it["section_name"]) {
+					it["section_name"] = firstNonEmpty(it["library_name"], libraryName)
+				}
+				items = append(items, it)
+			}
 		}
 		now := time.Now().Unix()
 		out := []map[string]any{}
@@ -116,8 +125,16 @@ func tautulliCmd() *cobra.Command {
 			if float64(size) < minSize*1073741824 || plays > maxPlays || days < minDays {
 				continue
 			}
+			it["play_count"] = plays
+			it["last_played"] = last
 			it["days_since_last_played"] = days
 			it["size_gb"] = float64(size) / 1073741824
+			if isNilish(it["section_name"]) {
+				it["section_name"] = firstNonEmpty(it["library_name"], "Unknown")
+			}
+			if isNilish(it["title"]) {
+				it["title"] = firstNonEmpty(it["sort_title"], "Unknown")
+			}
 			out = append(out, it)
 		}
 		if len(out) > limit {
@@ -131,10 +148,14 @@ func tautulliCmd() *cobra.Command {
 		}
 		rows := [][]string{}
 		for _, it := range out {
+			daysSincePlayed := fmt.Sprint(it["days_since_last_played"])
+			if toInt64(it["last_played"]) <= 0 {
+				daysSincePlayed = "Never"
+			}
 			rows = append(rows, output.ToStrings(
-				it["title"],
-				it["section_name"],
-				it["days_since_last_played"],
+				firstNonEmpty(it["title"], it["sort_title"], "Unknown"),
+				firstNonEmpty(it["section_name"], it["library_name"], "Unknown"),
+				daysSincePlayed,
 				it["play_count"],
 				fmt.Sprintf("%.2f", it["size_gb"]),
 			))
@@ -148,4 +169,28 @@ func tautulliCmd() *cobra.Command {
 	stale.Flags().Int("limit", 50, "")
 	cmd.AddCommand(stale)
 	return cmd
+}
+
+func firstNonEmpty(vals ...any) string {
+	for _, v := range vals {
+		if s := normalizeString(v); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func isNilish(v any) bool {
+	return normalizeString(v) == ""
+}
+
+func normalizeString(v any) string {
+	if v == nil {
+		return ""
+	}
+	s := strings.TrimSpace(fmt.Sprint(v))
+	if s == "" || s == "<nil>" {
+		return ""
+	}
+	return s
 }
