@@ -408,8 +408,6 @@ radarr_info() {
 
     _profiles="$(api_request GET "/api/v3/qualityprofile")"
     _profile_lookup="$(printf '%s' "$_profiles" | jq 'map({(.id|tostring): .name}) | add // {}')"
-    _tags="$(api_request GET "/api/v3/tag")"
-    _tag_lookup="$(printf '%s' "$_tags" | jq 'map({(.id|tostring): .label}) | add // {}')"
 
     _out='[]'
     _idx=0
@@ -424,7 +422,6 @@ radarr_info() {
 
         _enriched="$(printf '%s' "$_one" | jq \
             --argjson profiles "$_profile_lookup" \
-            --argjson tags "$_tag_lookup" \
             --argjson movieFile "$_movie_file" \
             '{
                 id,
@@ -433,10 +430,11 @@ radarr_info() {
                 status,
                 monitored,
                 qualityProfileName: ($profiles[(.qualityProfileId|tostring)] // "Unknown"),
-                rootFolder: (.rootFolderPath // ""),
                 overview: (.overview // ""),
-                tags: ((.tags // []) | map($tags[(tostring)] // ("Tag-" + (tostring)))),
-                movieFile: ($movieFile // .movieFile // null)
+                movieSizeGb: (
+                    (($movieFile // .movieFile // null) | .size // null)
+                    | if . == null then null else ((. / (1024*1024*1024) * 10 | round) / 10) end
+                )
             }')"
 
         _out="$(printf '%s\n%s' "$_out" "$_enriched" | jq -s '.[0] + [.[1]]')"
@@ -444,7 +442,7 @@ radarr_info() {
     done
 
     printf '%s' "$_out" | format_table \
-        "ID|Title|Year|Status|Monitored|Quality Profile|Root Folder|Tags|Movie File|Overview" \
+        "ID|Title|Year|Status|Monitored|Quality Profile|Size (GB)|Overview" \
         '.[] | [
             .id,
             .title,
@@ -452,9 +450,7 @@ radarr_info() {
             .status,
             (if .monitored then "Yes" else "No" end),
             .qualityProfileName,
-            .rootFolder,
-            ((.tags // []) | join(", ")),
-            (if (.movieFile // null) == null then "Not Downloaded" else ((.movieFile.relativePath // .movieFile.path // "") + " | " + (((.movieFile.size // 0) / (1024*1024*1024) | floor | tostring) + " GB") + " | " + (.movieFile.quality.quality.name // "Unknown")) end),
+            (if .movieSizeGb == null then "Not Downloaded" else ((.movieSizeGb | tostring) + " GB") end),
             .overview
         ]'
 }
