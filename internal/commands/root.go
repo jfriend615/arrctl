@@ -11,7 +11,7 @@ var (
 	cfgPath string
 	format  string
 	quiet   bool
-	version = "0.2.1"
+	version = "dev"
 )
 
 type exitError struct {

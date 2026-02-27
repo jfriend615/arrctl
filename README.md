@@ -19,47 +19,41 @@ curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | 
 ```
 
 This will:
-- Clone arrctl to `~/.arrctl`
-- Create a symlink in `/usr/local/bin`
+- Download the latest prebuilt `arrctl` binary from GitHub Releases
+- Install it to `/usr/local/bin/arrctl` (or `BIN_DIR`)
 - Generate a config template at `~/.config/arrctl/config.json`
 
-### Custom Installation Paths
+### Custom Installation Options
 
 ```sh
-# Install to a different directory
-INSTALL_DIR=~/tools/arrctl BIN_DIR=~/bin curl -sSL ... | sh
+# Install to a different bin directory
+BIN_DIR=~/bin curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
 
-# Or set variables before running
-export INSTALL_DIR="$HOME/tools/arrctl"
-export BIN_DIR="$HOME/bin"
-curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
+# Install a specific release version
+VERSION=v0.3.0 curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
 ```
 
-### Manual Installation
+### Manual Installation (from source)
 
 ```sh
-# Clone the repository
-git clone https://github.com/jfriend615/arrctl.git ~/.arrctl
-
-# Create symlink (may need sudo)
-ln -s ~/.arrctl/bin/arrctl /usr/local/bin/arrctl
-
-# Or add to PATH in your shell profile
-echo 'export PATH="$PATH:$HOME/.arrctl/bin"' >> ~/.bashrc
+git clone https://github.com/jfriend615/arrctl.git
+cd arrctl
+go build -o arrctl ./cmd/arrctl
+install -m 755 arrctl /usr/local/bin/arrctl
 ```
 
 ### Updating
 
-Run the installer again - it will pull the latest changes:
+Run the installer again to fetch the latest release binary:
 
 ```sh
 curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
 ```
 
-Or manually:
+Or pin a specific version:
 
 ```sh
-cd ~/.arrctl && git pull
+VERSION=v0.3.0 curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
 ```
 
 ### Uninstalling
