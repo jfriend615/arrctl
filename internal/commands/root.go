@@ -19,7 +19,12 @@ type exitError struct {
 	err  error
 }
 
-func (e *exitError) Error() string { return e.err.Error() }
+func (e *exitError) Error() string {
+	if e == nil || e.err == nil {
+		return ""
+	}
+	return e.err.Error()
+}
 
 func exitErr(code int, err error) error { return &exitError{code: code, err: err} }
 
