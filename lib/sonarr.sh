@@ -410,8 +410,6 @@ sonarr_info() {
 
     _profiles="$(api_request GET "/api/v3/qualityprofile")"
     _profile_lookup="$(printf '%s' "$_profiles" | jq 'map({(.id|tostring): .name}) | add // {}')"
-    _tags="$(api_request GET "/api/v3/tag")"
-    _tag_lookup="$(printf '%s' "$_tags" | jq 'map({(.id|tostring): .label}) | add // {}')"
 
     _out='[]'
     _idx=0
@@ -421,13 +419,10 @@ sonarr_info() {
 
         _episodes="$(api_request GET "/api/v3/episode?seriesId=${_series_id}")"
         _episode_count="$(printf '%s' "$_episodes" | jq 'length')"
-        _episode_files="$(api_request GET "/api/v3/episodefile?seriesId=${_series_id}")"
 
         _enriched="$(printf '%s' "$_one" | jq \
             --argjson profiles "$_profile_lookup" \
-            --argjson tags "$_tag_lookup" \
             --argjson episodeCount "$_episode_count" \
-            --argjson episodeFiles "$_episode_files" \
             '{
                 id,
                 title,
@@ -435,12 +430,9 @@ sonarr_info() {
                 status,
                 monitored,
                 qualityProfileName: ($profiles[(.qualityProfileId|tostring)] // "Unknown"),
-                rootFolder: (.rootFolderPath // ""),
                 overview: (.overview // ""),
-                tags: ((.tags // []) | map($tags[(tostring)] // ("Tag-" + (tostring)))),
                 seasonsCount: ((.seasons // []) | length),
-                episodesCount: $episodeCount,
-                episodeFiles: ($episodeFiles | map(.relativePath // .path // ("ID:" + (.id|tostring))))
+                episodesCount: $episodeCount
             }')"
 
         _out="$(printf '%s\n%s' "$_out" "$_enriched" | jq -s '.[0] + [.[1]]')"
@@ -448,7 +440,7 @@ sonarr_info() {
     done
 
     printf '%s' "$_out" | format_table \
-        "ID|Title|Year|Status|Monitored|Quality Profile|Root Folder|Seasons|Episodes|Tags|Episode Files|Overview" \
+        "ID|Title|Year|Status|Monitored|Quality Profile|Seasons|Episodes|Overview" \
         '.[] | [
             .id,
             .title,
@@ -456,11 +448,8 @@ sonarr_info() {
             .status,
             (if .monitored then "Yes" else "No" end),
             .qualityProfileName,
-            .rootFolder,
             .seasonsCount,
             .episodesCount,
-            ((.tags // []) | join(", ")),
-            ((.episodeFiles // []) | join(", ")),
             .overview
         ]'
 }
