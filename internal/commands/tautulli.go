@@ -40,7 +40,16 @@ func tautulliCmd() *cobra.Command {
 		if quiet {
 			return nil
 		}
-		return output.PrintJSON(resp.Response.Data.Sessions)
+		rows := [][]string{}
+		for _, s := range resp.Response.Data.Sessions {
+			rows = append(rows, output.ToStrings(
+				s["user"],
+				s["title"],
+				s["state"],
+				s["progress_percent"],
+			))
+		}
+		return render(resp.Response.Data.Sessions, []string{"User", "Title", "State", "Progress"}, rows)
 	}})
 	stale := &cobra.Command{Use: "stale", RunE: func(cmd *cobra.Command, args []string) error {
 		c, _, err := serviceClient("tautulli")
@@ -120,7 +129,17 @@ func tautulliCmd() *cobra.Command {
 			}
 			return exitErr(1, nil)
 		}
-		return output.PrintJSON(out)
+		rows := [][]string{}
+		for _, it := range out {
+			rows = append(rows, output.ToStrings(
+				it["title"],
+				it["section_name"],
+				it["days_since_last_played"],
+				it["play_count"],
+				fmt.Sprintf("%.2f", it["size_gb"]),
+			))
+		}
+		return render(out, []string{"Title", "Library", "Days Since Played", "Plays", "Size (GB)"}, rows)
 	}}
 	stale.Flags().String("library", "", "")
 	stale.Flags().Int("min-days", 180, "")

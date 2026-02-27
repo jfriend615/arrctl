@@ -100,3 +100,10 @@ func toInt64(v any) int64 {
 		return 0
 	}
 }
+
+func toMap(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	return map[string]any{}
+}

@@ -16,7 +16,26 @@ func overseerrCmd() *cobra.Command {
 		if err := c.Do(cmd.Context(), "GET", "/api/v1/request?filter=pending&take=100", nil, &out); err != nil {
 			return err
 		}
-		return output.PrintJSON(out["results"])
+		results, ok := out["results"].([]any)
+		if !ok {
+			return output.PrintJSON(out["results"])
+		}
+		rows := [][]string{}
+		for _, r := range results {
+			req, ok := r.(map[string]any)
+			if !ok {
+				continue
+			}
+			media := toMap(req["media"])
+			user := toMap(req["requestedBy"])
+			rows = append(rows, output.ToStrings(
+				media["title"],
+				media["mediaType"],
+				user["username"],
+				req["createdAt"],
+			))
+		}
+		return render(results, []string{"Title", "Type", "Requested By", "Created"}, rows)
 	}})
 	approve := &cobra.Command{Use: "approve <id>", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
 		c, _, err := serviceClient("overseerr")
