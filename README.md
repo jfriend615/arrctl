@@ -175,28 +175,24 @@ arrctl tautulli now             # Who's streaming right now
 
 ## Project Structure
 
+Go port layout:
+
 ```
 arrctl/
-├── bin/
-│   └── arrctl          # Main entry point
-├── lib/
-│   ├── common.sh       # Shared utilities
-│   ├── sonarr.sh       # Sonarr commands
-│   ├── radarr.sh       # Radarr commands
-│   ├── overseerr.sh    # Overseerr commands
-│   └── tautulli.sh     # Tautulli commands
-├── completions/
-│   ├── arrctl.bash     # Bash completion
-│   ├── _arrctl         # Zsh completion
-│   └── install.sh      # Completion installer
-├── config/
-│   └── config.json     # Config template
-├── test/
-│   └── smoke.sh        # Smoke tests
-├── install.sh          # Installer script
-├── Makefile            # Development tasks
-├── .gitignore
-└── README.md
+├── cmd/arrctl/         # Go CLI entrypoint
+├── internal/
+│   ├── api/            # Unified HTTP clients for *arr + Tautulli
+│   ├── commands/       # Cobra command handlers
+│   ├── config/         # Config loader + env precedence
+│   └── output/         # JSON/table rendering
+├── go.mod
+└── ...
+```
+
+Legacy shell implementation remains in:
+
+```
+bin/, lib/, completions/
 ```
 
 ## Development
