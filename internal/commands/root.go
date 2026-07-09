@@ -47,7 +47,7 @@ func rootCmd() *cobra.Command {
 	root.PersistentFlags().StringVar(&format, "format", "auto", "json|table|auto")
 	root.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Quiet mode")
 	root.Version = version
-	root.AddCommand(sonarrCmd(), radarrCmd(), overseerrCmd(), tautulliCmd(), calendarCmd(), completionCmd(root))
+	root.AddCommand(sonarrCmd(), radarrCmd(), overseerrCmd(), tautulliCmd(), calendarCmd(), completionCmd(root), updateCmd())
 	return root
 }
 
