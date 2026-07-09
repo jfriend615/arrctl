@@ -13,7 +13,7 @@ func TestComputeStaleScoreMatchesShellFormula(t *testing.T) {
 func TestDaysSinceLastPlayedTreatsNeverPlayedAsMaxAge(t *testing.T) {
 	now := int64(1772222400)
 	added30DaysAgo := now - (30 * 86400)
-	if got := daysSinceLastPlayed(now, 0, added30DaysAgo); got != 999999 {
-		t.Fatalf("expected never-played sentinel age, got %d", got)
+	if got := daysSinceLastPlayed(now, 0, added30DaysAgo); got != 30 {
+		t.Fatalf("expected never-played age to fall back to added_at, got %d", got)
 	}
 }

@@ -33,7 +33,17 @@ error() { printf "%s✗%s %s\n" "$RED" "$RESET" "$1" >&2; }
 die() { error "$1"; exit 1; }
 
 cleanup_path() {
-    [ -n "${1:-}" ] && [ -e "$1" ] && rm -f "$1"
+    if [ -n "${1:-}" ] && [ -e "$1" ]; then
+        rm -f "$1"
+    fi
+    return 0
+}
+
+cleanup_path_sudo() {
+    if [ -n "${1:-}" ]; then
+        sudo rm -f "$1" >/dev/null 2>&1 || true
+    fi
+    return 0
 }
 
 check_dependencies() {
@@ -134,11 +144,17 @@ download_and_install() {
         mv -f "$tmp_target" "$target" || die "Cannot replace $target"
     elif command -v sudo >/dev/null 2>&1; then
         tmp_target="$target_dir/.arrctl-install.$$"
-        sudo rm -f "$tmp_target"
+        cleanup_path_sudo "$tmp_target"
         trap 'rm -rf "$tmp_dir"' EXIT INT TERM
         sudo cp "$bin_src" "$tmp_target" || die "Cannot stage $target"
-        sudo chmod 755 "$tmp_target" || die "Cannot chmod +x $tmp_target"
-        sudo mv -f "$tmp_target" "$target" || die "Cannot replace $target"
+        sudo chmod 755 "$tmp_target" || {
+            cleanup_path_sudo "$tmp_target"
+            die "Cannot chmod +x $tmp_target"
+        }
+        sudo mv -f "$tmp_target" "$target" || {
+            cleanup_path_sudo "$tmp_target"
+            die "Cannot replace $target"
+        }
     else
         die "Cannot write to $target"
     fi

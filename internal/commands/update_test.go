@@ -64,6 +64,36 @@ func TestNewUpdaterConfiguresHTTPTimeout(t *testing.T) {
 	}
 }
 
+func TestNewUpdaterRejectsSymlinkedExecutable(t *testing.T) {
+	oldExecutable := updateExecutable
+	oldRuntimeGOOS := updateRuntimeGOOS
+	oldRuntimeGOARCH := updateRuntimeGOARCH
+	t.Cleanup(func() {
+		updateExecutable = oldExecutable
+		updateRuntimeGOOS = oldRuntimeGOOS
+		updateRuntimeGOARCH = oldRuntimeGOARCH
+	})
+
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "target-arrctl")
+	link := filepath.Join(tmpDir, "arrctl")
+	if err := os.WriteFile(target, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	updateExecutable = func() (string, error) { return link, nil }
+	updateRuntimeGOOS = "darwin"
+	updateRuntimeGOARCH = "amd64"
+
+	_, err := newUpdater()
+	if err == nil || !strings.Contains(err.Error(), "refusing to update symlinked executable") {
+		t.Fatalf("expected symlink rejection, got %v", err)
+	}
+}
+
 func TestResolveVersionFromRedirect(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/jfriend615/arrctl/releases/tag/v1.2.3", http.StatusFound)

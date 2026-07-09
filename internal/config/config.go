@@ -49,8 +49,10 @@ func defaultConfigPath() string {
 func Load(pathFlag string) (Config, error) {
 	var cfg Config
 	path := strings.TrimSpace(pathFlag)
+	explicitPath := path != ""
 	if path == "" {
 		path = strings.TrimSpace(os.Getenv("ARRCTL_CONFIG"))
+		explicitPath = path != ""
 	}
 	if path == "" {
 		path = defaultConfigPath()
@@ -59,6 +61,8 @@ func Load(pathFlag string) (Config, error) {
 		if err := json.Unmarshal(b, &cfg); err != nil {
 			return cfg, fmt.Errorf("invalid JSON in config %s: %w", path, err)
 		}
+	} else if explicitPath && errors.Is(err, os.ErrNotExist) {
+		return cfg, fmt.Errorf("config file not found: %s", path)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return cfg, err
 	}

@@ -57,9 +57,6 @@ Options:
   arrctl calendar --days 14 --sonarr
   arrctl calendar --radarr`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if onlySonarr && onlyRadarr {
-				return fmt.Errorf("--sonarr and --radarr cannot be used together")
-			}
 			start, end := calendarRange(time.Now(), days, week)
 			svcs := []string{"sonarr", "radarr"}
 			if onlySonarr {
@@ -74,6 +71,9 @@ Options:
 				rows, err := fetchServiceCalendar(cmd.Context(), s, s == "sonarr", start, end)
 				if err != nil {
 					if config.IsMissingServiceConfig(err) {
+						if len(svcs) == 1 {
+							return err
+						}
 						continue
 					}
 					return err

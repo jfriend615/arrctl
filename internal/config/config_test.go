@@ -86,3 +86,12 @@ func TestLoad_DefaultPathUsesXDGConfigHome(t *testing.T) {
 		t.Fatalf("unexpected service: %+v", s)
 	}
 }
+
+func TestLoad_ExplicitMissingPathErrors(t *testing.T) {
+	d := t.TempDir()
+	path := filepath.Join(d, "missing.json")
+	_, err := Load(path)
+	if err == nil || err.Error() != "config file not found: "+path {
+		t.Fatalf("expected explicit missing path error, got %v", err)
+	}
+}

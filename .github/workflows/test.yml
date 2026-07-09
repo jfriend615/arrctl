@@ -17,3 +17,6 @@ jobs:
 
       - name: Run Go tests
         run: go test ./...
+
+      - name: Run Go CLI smoke tests
+        run: make test-shell

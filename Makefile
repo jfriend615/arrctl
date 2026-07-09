@@ -1,6 +1,9 @@
 # arrctl Makefile
 # Convenience targets for development and installation
 
+ARRCTL_TEST_BIN := /private/tmp/arrctl-test-bin
+GOCACHE ?= /private/tmp/arrctl-go-build-cache
+
 .PHONY: install uninstall test test-go test-shell lint clean help
 
 # Default target
@@ -14,7 +17,7 @@ help:
 	@echo "  uninstall  Remove arrctl installation"
 	@echo "  test       Run Go tests"
 	@echo "  test-go    Run Go tests"
-	@echo "  test-shell Run legacy shell smoke tests"
+	@echo "  test-shell Run Go CLI smoke tests"
 	@echo "  lint       Run shellcheck on all scripts"
 	@echo "  clean      Remove generated files"
 	@echo "  help       Show this help"
@@ -33,12 +36,14 @@ test:
 	@$(MAKE) test-go
 
 test-go:
-	@go test ./...
+	@GOCACHE=$(GOCACHE) go test ./...
 
 test-shell:
-	@chmod +x test/smoke.sh test/completion.sh
-	@./test/smoke.sh
-	@./test/completion.sh
+	@GOCACHE=$(GOCACHE) go build -buildvcs=false -o $(ARRCTL_TEST_BIN) ./cmd/arrctl
+	@chmod +x test/smoke.sh test/completion.sh test/go-smoke.sh test/install-smoke.sh
+	@ARRCTL_BIN=$(ARRCTL_TEST_BIN) ./test/go-smoke.sh
+	@ARRCTL_BIN=$(ARRCTL_TEST_BIN) ./test/completion.sh
+	@./test/install-smoke.sh
 
 lint:
 	@echo "Running shellcheck..."

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 type Mode string
@@ -34,12 +35,12 @@ func PrintJSON(v any) error {
 func PrintTable(headers []string, rows [][]string) {
 	w := make([]int, len(headers))
 	for i, h := range headers {
-		w[i] = len(h)
+		w[i] = utf8.RuneCountInString(h)
 	}
 	for _, r := range rows {
 		for i, c := range r {
-			if len(c) > w[i] {
-				w[i] = len(c)
+			if n := utf8.RuneCountInString(c); n > w[i] {
+				w[i] = n
 			}
 		}
 	}

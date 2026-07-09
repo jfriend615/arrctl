@@ -248,9 +248,12 @@ func computeStaleScore(sizeGB float64, daysSinceLastPlayed, plays, maxPlays int)
 	return (sizeGB * 0.6) + (float64(daysSinceLastPlayed) / 365.0 * 0.3) + (float64((maxPlays+1)-plays) * 0.1)
 }
 
-func daysSinceLastPlayed(nowEpoch, lastPlayed, _ int64) int {
+func daysSinceLastPlayed(nowEpoch, lastPlayed, addedAt int64) int {
 	if lastPlayed > 0 {
 		return int(math.Max(0, float64((nowEpoch-lastPlayed)/86400)))
+	}
+	if addedAt > 0 {
+		return int(math.Max(0, float64((nowEpoch-addedAt)/86400)))
 	}
 	return 999999
 }
