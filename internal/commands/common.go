@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/jfriend615/arrctl/internal/api"
@@ -32,17 +33,22 @@ func render(v any, headers []string, rows [][]string) error {
 	return nil
 }
 
-func resolveQuality(ctx context.Context, c *api.Client, explicit, def string) (int, error) {
+func validateFormat(v string) error {
+	switch output.Mode(v) {
+	case output.Auto, output.Table, output.JSON:
+		return nil
+	default:
+		return fmt.Errorf("invalid format: %s (use json|table|auto)", v)
+	}
+}
+
+func resolveQuality(ctx context.Context, c *api.Client, explicit, def string, warn io.Writer) (int, error) {
 	var p []profile
 	if err := c.Do(ctx, "GET", "/api/v3/qualityprofile", nil, &p); err != nil {
 		return 0, err
 	}
-	pick := explicit
-	if pick == "" {
-		pick = def
-	}
-	if pick != "" {
-		if n, err := strconv.Atoi(pick); err == nil {
+	if explicit != "" {
+		if n, err := strconv.Atoi(explicit); err == nil {
 			for _, pr := range p {
 				if pr.ID == n {
 					return n, nil
@@ -50,11 +56,21 @@ func resolveQuality(ctx context.Context, c *api.Client, explicit, def string) (i
 			}
 		}
 		for _, pr := range p {
-			if pr.Name == pick {
+			if pr.Name == explicit {
 				return pr.ID, nil
 			}
 		}
-		return 0, fmt.Errorf("quality profile not found: %s", pick)
+		return 0, fmt.Errorf("quality profile not found: %s", explicit)
+	}
+	if def != "" {
+		for _, pr := range p {
+			if pr.Name == def {
+				return pr.ID, nil
+			}
+		}
+		if !quiet && warn != nil {
+			fmt.Fprintf(warn, "Warning: configured default quality profile %q not found, using first available\n", def)
+		}
 	}
 	if len(p) == 0 {
 		return 0, errors.New("no quality profiles available")
@@ -62,22 +78,28 @@ func resolveQuality(ctx context.Context, c *api.Client, explicit, def string) (i
 	return p[0].ID, nil
 }
 
-func resolveRoot(ctx context.Context, c *api.Client, explicit, def string) (string, error) {
+func resolveRoot(ctx context.Context, c *api.Client, explicit, def string, warn io.Writer) (string, error) {
 	var r []rootFolder
 	if err := c.Do(ctx, "GET", "/api/v3/rootfolder", nil, &r); err != nil {
 		return "", err
 	}
-	pick := explicit
-	if pick == "" {
-		pick = def
-	}
-	if pick != "" {
+	if explicit != "" {
 		for _, rr := range r {
-			if rr.Path == pick {
-				return pick, nil
+			if rr.Path == explicit {
+				return explicit, nil
 			}
 		}
-		return "", fmt.Errorf("root folder not found: %s", pick)
+		return "", fmt.Errorf("root folder not found: %s", explicit)
+	}
+	if def != "" {
+		for _, rr := range r {
+			if rr.Path == def {
+				return def, nil
+			}
+		}
+		if !quiet && warn != nil {
+			fmt.Fprintf(warn, "Warning: configured default root folder %q not found, using first available\n", def)
+		}
 	}
 	if len(r) == 0 {
 		return "", errors.New("no root folders configured")

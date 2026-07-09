@@ -55,6 +55,9 @@ Commands:
 func arrListCmd(service, noun string) *cobra.Command {
 	var monitored, unmonitored bool
 	cmd := &cobra.Command{Use: "list", Short: "List library items", RunE: func(cmd *cobra.Command, args []string) error {
+		if monitored && unmonitored {
+			return errors.New("--monitored and --unmonitored cannot be used together")
+		}
 		c, _, err := serviceClient(service)
 		if err != nil {
 			return err
@@ -188,14 +191,14 @@ func arrAddCmd(service, noun, idType string) *cobra.Command {
 		if !quiet {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Found: %s\n", item.Title)
 		}
-		qid, err := resolveQuality(ctx, c, quality, s.Defaults.QualityProfile)
+		qid, err := resolveQuality(ctx, c, quality, s.Defaults.QualityProfile, cmd.ErrOrStderr())
 		if err != nil {
 			return err
 		}
 		if !quiet {
 			fmt.Fprintf(cmd.ErrOrStderr(), "Using quality profile ID: %d\n", qid)
 		}
-		rp, err := resolveRoot(ctx, c, root, s.Defaults.RootFolder)
+		rp, err := resolveRoot(ctx, c, root, s.Defaults.RootFolder, cmd.ErrOrStderr())
 		if err != nil {
 			return err
 		}

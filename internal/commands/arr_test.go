@@ -32,6 +32,27 @@ func TestSearchRejectsNegativeLimit(t *testing.T) {
 	}
 }
 
+func TestListRejectsConflictingMonitoredFlags(t *testing.T) {
+	oldCfgPath, oldFormat, oldQuiet := cfgPath, format, quiet
+	t.Cleanup(func() {
+		cfgPath = oldCfgPath
+		format = oldFormat
+		quiet = oldQuiet
+	})
+
+	cfgPath = ""
+	format = "json"
+	quiet = false
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"sonarr", "list", "--monitored", "--unmonitored"})
+
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "--monitored and --unmonitored cannot be used together") {
+		t.Fatalf("expected conflicting monitored flag error, got %v", err)
+	}
+}
+
 func TestSonarrAddPrintsBashStyleProgress(t *testing.T) {
 	t.Helper()
 

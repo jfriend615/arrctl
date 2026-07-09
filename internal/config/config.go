@@ -9,6 +9,19 @@ import (
 	"strings"
 )
 
+type MissingServiceConfigError struct {
+	Service string
+}
+
+func (e MissingServiceConfigError) Error() string {
+	return fmt.Sprintf("missing %s configuration", e.Service)
+}
+
+func IsMissingServiceConfig(err error) bool {
+	var target MissingServiceConfigError
+	return errors.As(err, &target)
+}
+
 type Service struct {
 	URL      string `json:"url"`
 	APIKey   string `json:"api_key"`
@@ -49,19 +62,19 @@ func Load(pathFlag string) (Config, error) {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return cfg, err
 	}
-	overlay(&cfg.Sonarr, "SONARR")
-	overlay(&cfg.Radarr, "RADARR")
-	overlay(&cfg.Overseerr, "OVERSEERR")
-	overlay(&cfg.Tautulli, "TAUTULLI")
+	overlayPair(&cfg.Sonarr, "SONARR")
+	overlayPair(&cfg.Radarr, "RADARR")
+	overlayPair(&cfg.Overseerr, "OVERSEERR")
+	overlayPair(&cfg.Tautulli, "TAUTULLI")
 	return cfg, nil
 }
 
-func overlay(s *Service, prefix string) {
-	if v := os.Getenv(prefix + "_URL"); v != "" {
-		s.URL = v
-	}
-	if v := os.Getenv(prefix + "_API_KEY"); v != "" {
-		s.APIKey = v
+func overlayPair(s *Service, prefix string) {
+	url := os.Getenv(prefix + "_URL")
+	key := os.Getenv(prefix + "_API_KEY")
+	if url != "" && key != "" {
+		s.URL = url
+		s.APIKey = key
 	}
 }
 
@@ -80,7 +93,7 @@ func (c Config) MustService(name string) (Service, error) {
 		return Service{}, fmt.Errorf("unknown service: %s", name)
 	}
 	if s.URL == "" || s.APIKey == "" {
-		return Service{}, fmt.Errorf("missing %s configuration", name)
+		return Service{}, MissingServiceConfigError{Service: name}
 	}
 	return s, nil
 }

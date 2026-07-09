@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jfriend615/arrctl/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -14,13 +15,15 @@ func arrCalendarCmd(service string, sonarr bool) *cobra.Command {
 	var days int
 	var start, end string
 	cmd := &cobra.Command{Use: "calendar", Short: "Show service-specific upcoming releases", RunE: func(cmd *cobra.Command, args []string) error {
-		if start == "" {
-			start = time.Now().Format("2006-01-02")
+		startDate := start
+		endDate := end
+		if startDate == "" {
+			startDate = time.Now().Format("2006-01-02")
 		}
-		if end == "" {
-			end = time.Now().AddDate(0, 0, days).Format("2006-01-02")
+		if endDate == "" {
+			endDate = time.Now().AddDate(0, 0, days).Format("2006-01-02")
 		}
-		rows, err := fetchServiceCalendar(cmd.Context(), service, sonarr, start, end)
+		rows, err := fetchServiceCalendar(cmd.Context(), service, sonarr, startDate, endDate)
 		if err != nil {
 			return err
 		}
@@ -54,33 +57,39 @@ Options:
   arrctl calendar --days 14 --sonarr
   arrctl calendar --radarr`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-		start, end := calendarRange(time.Now(), days, week)
-		svcs := []string{"sonarr", "radarr"}
-		if onlySonarr {
-			svcs = []string{"sonarr"}
-		}
-		if onlyRadarr {
-			svcs = []string{"radarr"}
-		}
-
-		all := []calendarRow{}
-		for _, s := range svcs {
-			rows, err := fetchServiceCalendar(cmd.Context(), s, s == "sonarr", start, end)
-			if err != nil {
-				return err
+			if onlySonarr && onlyRadarr {
+				return fmt.Errorf("--sonarr and --radarr cannot be used together")
 			}
-			all = append(all, rows...)
-		}
-		sort.Slice(all, func(i, j int) bool { return all[i].Date < all[j].Date })
-		if len(all) == 0 && !quiet {
-			fmt.Fprintf(cmd.ErrOrStderr(), "No releases in this period (%s to %s)\n", start, end)
-		}
-		strRows := make([][]string, 0, len(all))
-		for _, r := range all {
-			strRows = append(strRows, []string{r.Date, r.Title, r.Episode, r.Service})
-		}
-		return render(all, []string{"Date", "Title", "Episode", "Service"}, strRows)
-	}}
+			start, end := calendarRange(time.Now(), days, week)
+			svcs := []string{"sonarr", "radarr"}
+			if onlySonarr {
+				svcs = []string{"sonarr"}
+			}
+			if onlyRadarr {
+				svcs = []string{"radarr"}
+			}
+
+			all := []calendarRow{}
+			for _, s := range svcs {
+				rows, err := fetchServiceCalendar(cmd.Context(), s, s == "sonarr", start, end)
+				if err != nil {
+					if config.IsMissingServiceConfig(err) {
+						continue
+					}
+					return err
+				}
+				all = append(all, rows...)
+			}
+			sort.Slice(all, func(i, j int) bool { return all[i].Date < all[j].Date })
+			if len(all) == 0 && !quiet {
+				fmt.Fprintf(cmd.ErrOrStderr(), "No releases in this period (%s to %s)\n", start, end)
+			}
+			strRows := make([][]string, 0, len(all))
+			for _, r := range all {
+				strRows = append(strRows, []string{r.Date, r.Title, r.Episode, r.Service})
+			}
+			return render(all, []string{"Date", "Title", "Episode", "Service"}, strRows)
+		}}
 	cmd.Flags().IntVar(&days, "days", 7, "")
 	cmd.Flags().BoolVar(&week, "week", false, "")
 	cmd.Flags().BoolVar(&onlySonarr, "sonarr", false, "")

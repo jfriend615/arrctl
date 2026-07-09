@@ -47,6 +47,9 @@ func rootCmd() *cobra.Command {
 		Short:         "Unified CLI for *arr",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return validateFormat(format)
+		},
 		Long: `arrctl - Unified CLI for managing *arr services
 
 Commands:

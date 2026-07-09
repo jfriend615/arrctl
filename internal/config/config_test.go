@@ -44,6 +44,26 @@ func TestLoad_EnvOverlay(t *testing.T) {
 	}
 }
 
+func TestLoad_IgnoresPartialEnvOverride(t *testing.T) {
+	d := t.TempDir()
+	cfg := filepath.Join(d, "config.json")
+	if err := os.WriteFile(cfg, []byte(`{"sonarr":{"url":"http://file","api_key":"k1"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SONARR_URL", "http://env")
+	c, err := Load(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := c.MustService("sonarr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.URL != "http://file" || s.APIKey != "k1" {
+		t.Fatalf("partial env override should be ignored: %+v", s)
+	}
+}
+
 func TestLoad_DefaultPathUsesXDGConfigHome(t *testing.T) {
 	d := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", d)

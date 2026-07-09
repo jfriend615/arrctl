@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -17,5 +18,12 @@ func TestExitErrorErrorHandlesNil(t *testing.T) {
 	e = &exitError{code: 1, err: errors.New("boom")}
 	if e.Error() != "boom" {
 		t.Fatalf("unexpected message: %q", e.Error())
+	}
+}
+
+func TestValidateFormatRejectsUnknownValue(t *testing.T) {
+	err := validateFormat("yaml")
+	if err == nil || !strings.Contains(err.Error(), "invalid format") {
+		t.Fatalf("expected invalid format error, got %v", err)
 	}
 }

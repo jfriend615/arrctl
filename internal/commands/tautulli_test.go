@@ -1,37 +1,19 @@
 package commands
 
-import (
-	"math"
-	"testing"
-)
+import "testing"
 
-func TestComputeStaleScoreCapsAgeContribution(t *testing.T) {
-	now := int64(1772222400)
-	sHuge := computeStaleScore(5.0, 999999, 0, 2, 1, 0, now)
-	sCapped := computeStaleScore(5.0, 3650, 0, 2, 1, 0, now)
-	if math.Abs(sHuge-sCapped) > 1e-9 {
-		t.Fatalf("expected capped age contribution, got huge=%f capped=%f", sHuge, sCapped)
+func TestComputeStaleScoreMatchesShellFormula(t *testing.T) {
+	got := computeStaleScore(5.5, 730, 1, 2)
+	want := (5.5 * 0.6) + (730.0 / 365.0 * 0.3) + (float64((2+1)-1) * 0.1)
+	if got != want {
+		t.Fatalf("expected shell stale score %f, got %f", want, got)
 	}
 }
 
-func TestComputeStaleScoreNeverPlayedGetsModerateBonus(t *testing.T) {
+func TestDaysSinceLastPlayedTreatsNeverPlayedAsMaxAge(t *testing.T) {
 	now := int64(1772222400)
 	added30DaysAgo := now - (30 * 86400)
-
-	sPlayed := computeStaleScore(5.0, 30, 0, 2, now-(30*86400), 0, now)
-	sNever := computeStaleScore(5.0, 999999, 0, 2, 0, added30DaysAgo, now)
-	if sNever <= sPlayed {
-		t.Fatalf("expected never-played to rank above similarly-aged played item: never=%f played=%f", sNever, sPlayed)
-	}
-	if sNever-sPlayed > 0.2 {
-		t.Fatalf("expected moderate never-played boost, got delta=%f", sNever-sPlayed)
-	}
-}
-
-func TestDaysSinceLastPlayedFallsBackToAddedAt(t *testing.T) {
-	now := int64(1772222400)
-	added30DaysAgo := now - (30 * 86400)
-	if got := daysSinceLastPlayed(now, 0, added30DaysAgo); got != 30 {
-		t.Fatalf("expected 30 days from added_at, got %d", got)
+	if got := daysSinceLastPlayed(now, 0, added30DaysAgo); got != 999999 {
+		t.Fatalf("expected never-played sentinel age, got %d", got)
 	}
 }

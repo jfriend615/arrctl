@@ -141,7 +141,7 @@ Commands:
 				continue
 			}
 			sizeGB := math.Floor((float64(size)/1073741824)*100) / 100
-			staleScore := computeStaleScore(sizeGB, days, plays, maxPlays, last, added, now)
+			staleScore := computeStaleScore(sizeGB, days, plays, maxPlays)
 			it["file_size"] = size
 			it["play_count"] = plays
 			it["last_played"] = last
@@ -244,57 +244,15 @@ func normalizeString(v any) string {
 	return s
 }
 
-func computeStaleScore(sizeGB float64, daysSinceLastPlayed, plays, maxPlays int, lastPlayed, addedAt, nowEpoch int64) float64 {
-	const (
-		sizeGBCap  = 20.0
-		ageDaysCap = 3650.0 // 10 years
-	)
-
-	sizeNorm := clamp01(sizeGB / sizeGBCap)
-
-	ageDays := float64(daysSinceLastPlayed)
-	if lastPlayed <= 0 {
-		switch {
-		case addedAt > 0:
-			ageDays = math.Max(0, float64((nowEpoch-addedAt)/86400))
-		default:
-			ageDays = ageDaysCap
-		}
-	}
-	ageNorm := clamp01(ageDays / ageDaysCap)
-
-	denominator := float64(maxPlays + 1)
-	if denominator <= 0 {
-		denominator = 1
-	}
-	playNorm := clamp01(1 - (float64(plays) / denominator))
-
-	neverPlayedBonus := 0.0
-	if lastPlayed <= 0 {
-		neverPlayedBonus = 0.15
-	}
-
-	return (sizeNorm * 0.4) + (ageNorm * 0.4) + (playNorm * 0.2) + neverPlayedBonus
+func computeStaleScore(sizeGB float64, daysSinceLastPlayed, plays, maxPlays int) float64 {
+	return (sizeGB * 0.6) + (float64(daysSinceLastPlayed) / 365.0 * 0.3) + (float64((maxPlays+1)-plays) * 0.1)
 }
 
-func daysSinceLastPlayed(nowEpoch, lastPlayed, addedAt int64) int {
+func daysSinceLastPlayed(nowEpoch, lastPlayed, _ int64) int {
 	if lastPlayed > 0 {
 		return int(math.Max(0, float64((nowEpoch-lastPlayed)/86400)))
 	}
-	if addedAt > 0 {
-		return int(math.Max(0, float64((nowEpoch-addedAt)/86400)))
-	}
 	return 999999
-}
-
-func clamp01(v float64) float64 {
-	if v < 0 {
-		return 0
-	}
-	if v > 1 {
-		return 1
-	}
-	return v
 }
 
 func toFloat64(v any) float64 {
