@@ -45,7 +45,10 @@ func (c *Client) Do(ctx context.Context, method, endpoint string, in any, out an
 		return err
 	}
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		if resp.StatusCode == http.StatusUnauthorized {
 			return fmt.Errorf("Authentication failed")
@@ -77,7 +80,10 @@ func (c *Client) Tautulli(ctx context.Context, cmd string, params map[string]str
 		return err
 	}
 	defer resp.Body.Close()
-	b, _ := io.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return fmt.Errorf("Tautulli request failed (HTTP %d)", resp.StatusCode)
 	}

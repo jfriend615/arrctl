@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,7 @@ var (
 	updateDownloadBase  = "https://github.com/" + updateRepo + "/releases/download"
 	updateExecutable    = os.Executable
 	updateMkdirTemp     = os.MkdirTemp
-	updateHTTPClient    = func() *http.Client { return &http.Client{} }
+	updateHTTPClient    = func() *http.Client { return &http.Client{Timeout: 30 * time.Second} }
 	updateRuntimeGOOS   = runtime.GOOS
 	updateRuntimeGOARCH = runtime.GOARCH
 	updateLookPath      = exec.LookPath

@@ -11,6 +11,27 @@ import (
 	"testing"
 )
 
+func TestSearchRejectsNegativeLimit(t *testing.T) {
+	oldCfgPath, oldFormat, oldQuiet := cfgPath, format, quiet
+	t.Cleanup(func() {
+		cfgPath = oldCfgPath
+		format = oldFormat
+		quiet = oldQuiet
+	})
+
+	cfgPath = ""
+	format = "json"
+	quiet = false
+
+	cmd := rootCmd()
+	cmd.SetArgs([]string{"sonarr", "search", "test", "--limit", "-1"})
+
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "--limit must be >= 0") {
+		t.Fatalf("expected negative limit error, got %v", err)
+	}
+}
+
 func TestSonarrAddPrintsBashStyleProgress(t *testing.T) {
 	t.Helper()
 

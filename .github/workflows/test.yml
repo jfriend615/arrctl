@@ -3,28 +3,17 @@ name: Test
 on: [push, pull_request]
 
 jobs:
-  shellcheck:
-    name: ShellCheck
+  go-test:
+    name: Go Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@master
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          scandir: .
-          additional_files: bin/arrctl lib/*.sh
+          go-version-file: go.mod
 
-  posix:
-    name: POSIX Compatibility
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install dash
-        run: sudo apt-get update && sudo apt-get install -y dash
-
-      - name: Test with dash
-        run: dash bin/arrctl --help
+      - name: Run Go tests
+        run: go test ./...

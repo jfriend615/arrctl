@@ -27,3 +27,11 @@ func TestComputeStaleScoreNeverPlayedGetsModerateBonus(t *testing.T) {
 		t.Fatalf("expected moderate never-played boost, got delta=%f", sNever-sPlayed)
 	}
 }
+
+func TestDaysSinceLastPlayedFallsBackToAddedAt(t *testing.T) {
+	now := int64(1772222400)
+	added30DaysAgo := now - (30 * 86400)
+	if got := daysSinceLastPlayed(now, 0, added30DaysAgo); got != 30 {
+		t.Fatalf("expected 30 days from added_at, got %d", got)
+	}
+}

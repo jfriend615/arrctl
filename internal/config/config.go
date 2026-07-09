@@ -26,6 +26,9 @@ type Config struct {
 }
 
 func defaultConfigPath() string {
+	if cfgHome := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); cfgHome != "" {
+		return filepath.Join(cfgHome, "arrctl", "config.json")
+	}
 	h, _ := os.UserHomeDir()
 	return filepath.Join(h, ".config", "arrctl", "config.json")
 }

@@ -59,7 +59,7 @@ Commands:
   update      Update arrctl to the latest release
 
 Configuration:
-  Default config: ~/.config/arrctl/config.json
+  Default config: $XDG_CONFIG_HOME/arrctl/config.json or ~/.config/arrctl/config.json
   Or set environment variables:
     ARRCTL_CONFIG
     SONARR_URL / SONARR_API_KEY

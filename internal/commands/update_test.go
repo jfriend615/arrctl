@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizeVersion(t *testing.T) {
@@ -33,6 +34,33 @@ func TestReleasePlatform(t *testing.T) {
 	}
 	if goos != "darwin" || goarch != "amd64" {
 		t.Fatalf("unexpected platform: %s/%s", goos, goarch)
+	}
+}
+
+func TestNewUpdaterConfiguresHTTPTimeout(t *testing.T) {
+	oldExecutable := updateExecutable
+	oldRuntimeGOOS := updateRuntimeGOOS
+	oldRuntimeGOARCH := updateRuntimeGOARCH
+	t.Cleanup(func() {
+		updateExecutable = oldExecutable
+		updateRuntimeGOOS = oldRuntimeGOOS
+		updateRuntimeGOARCH = oldRuntimeGOARCH
+	})
+
+	exe := filepath.Join(t.TempDir(), "arrctl")
+	if err := os.WriteFile(exe, []byte("binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	updateExecutable = func() (string, error) { return exe, nil }
+	updateRuntimeGOOS = "darwin"
+	updateRuntimeGOARCH = "amd64"
+
+	u, err := newUpdater()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.httpClient.Timeout != 30*time.Second {
+		t.Fatalf("expected 30s timeout, got %s", u.httpClient.Timeout)
 	}
 }
 

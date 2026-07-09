@@ -43,3 +43,26 @@ func TestLoad_EnvOverlay(t *testing.T) {
 		t.Fatalf("overlay failed: %+v", s)
 	}
 }
+
+func TestLoad_DefaultPathUsesXDGConfigHome(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", d)
+	path := filepath.Join(d, "arrctl", "config.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"sonarr":{"url":"http://xdg","api_key":"k"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := c.MustService("sonarr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.URL != "http://xdg" || s.APIKey != "k" {
+		t.Fatalf("unexpected service: %+v", s)
+	}
+}

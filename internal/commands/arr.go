@@ -108,6 +108,9 @@ func arrListCmd(service, noun string) *cobra.Command {
 func arrSearchCmd(service, noun string) *cobra.Command {
 	var limit int
 	cmd := &cobra.Command{Use: "search <term>", Short: "Search for media by name", Args: cobra.MinimumNArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		if limit < 0 {
+			return errors.New("--limit must be >= 0")
+		}
 		c, _, err := serviceClient(service)
 		if err != nil {
 			return err

@@ -5,10 +5,9 @@ Unified CLI for managing *arr services (Sonarr, Radarr, Overseerr, Tautulli).
 ## Features
 
 - Single entry point for all *arr services
-- POSIX compliant (works with sh, dash, bash)
 - Config file or environment variable configuration
 - Pipeable JSON output for scripting
-- Minimal dependencies (curl, jq)
+- Minimal runtime dependencies
 
 ## Quick Start
 
@@ -27,10 +26,10 @@ This will:
 
 ```sh
 # Install to a different bin directory
-BIN_DIR=~/bin curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | BIN_DIR=~/bin sh
 
 # Install a specific release version
-VERSION=v0.3.0 curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | VERSION=v0.3.0 sh
 ```
 
 ### Manual Installation (from source)
@@ -53,7 +52,7 @@ curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | 
 Or pin a specific version:
 
 ```sh
-VERSION=v0.3.0 curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | VERSION=v0.3.0 sh
 ```
 
 ### Uninstalling
@@ -64,19 +63,15 @@ make uninstall
 
 # Or manually
 rm /usr/local/bin/arrctl
-rm -rf ~/.arrctl
 rm -rf ~/.config/arrctl  # optional: remove config
 ```
 
 ## Requirements
 
-- POSIX shell (sh, dash, bash, etc.)
 - curl
-- jq
-- git (for installation)
-
-Optional:
-- shellcheck (for development/linting)
+- tar
+- shasum or sha256sum
+- Go 1.26+ for building from source or running tests
 
 ## Configuration
 
@@ -160,16 +155,14 @@ arrctl radarr add --id 603 --search
 
 # Overseerr (Requests)
 arrctl overseerr pending        # View pending requests
-arrctl overseerr approve --id 123
-arrctl overseerr deny --id 456 --reason "Duplicate"
+arrctl overseerr approve 123
+arrctl overseerr deny 456 --reason "Duplicate"
 
 # Tautulli (Plex activity)
 arrctl tautulli now             # Who's streaming right now
 ```
 
 ## Project Structure
-
-Go port layout:
 
 ```
 arrctl/
@@ -181,12 +174,6 @@ arrctl/
 │   └── output/         # JSON/table rendering
 ├── go.mod
 └── ...
-```
-
-Legacy shell implementation remains in:
-
-```
-bin/, lib/, completions/
 ```
 
 ## Development
@@ -201,36 +188,31 @@ cd arrctl
 ### Testing
 
 ```sh
-# Run smoke tests
+# Run Go tests
 make test
 
 # Or directly
-./test/smoke.sh
+go test ./...
 ```
 
-### Linting
+### Building
 
 ```sh
-# Check all scripts with shellcheck
-make lint
-
-# Or directly
-shellcheck bin/arrctl lib/*.sh install.sh
+go build ./cmd/arrctl
 ```
 
-### POSIX Compliance
+### Updating Dependencies
 
 ```sh
-# Test with dash (stricter than bash)
-dash bin/arrctl --help
+go get -u ./...
+go mod tidy
 ```
 
 ### Code Style
 
-- POSIX /bin/sh compliant (no bashisms)
-- shellcheck clean (no warnings or errors)
-- DRY principles via common.sh
-- Functions documented with usage comments
+- Keep the CLI simple and user-facing behavior predictable.
+- Prefer the standard library unless a dependency materially simplifies the code.
+- Keep command logic covered by `go test ./...`.
 
 ## License
 

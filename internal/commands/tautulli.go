@@ -136,15 +136,12 @@ Commands:
 			plays := int(toInt64(it["play_count"]))
 			last := toInt64(it["last_played"])
 			added := toInt64(it["added_at"])
-			days := 999999
-			if last > 0 {
-				days = int((now - last) / 86400)
-			}
+			days := daysSinceLastPlayed(now, last, added)
 			if float64(size) < minSize*1073741824 || plays > maxPlays || days < minDays {
 				continue
 			}
 			sizeGB := math.Floor((float64(size)/1073741824)*100) / 100
-			staleScore := (sizeGB * 0.6) + (float64(days)/365 * 0.3) + (float64((maxPlays+1)-plays) * 0.1)
+			staleScore := computeStaleScore(sizeGB, days, plays, maxPlays, last, added, now)
 			it["file_size"] = size
 			it["play_count"] = plays
 			it["last_played"] = last
@@ -278,6 +275,16 @@ func computeStaleScore(sizeGB float64, daysSinceLastPlayed, plays, maxPlays int,
 	}
 
 	return (sizeNorm * 0.4) + (ageNorm * 0.4) + (playNorm * 0.2) + neverPlayedBonus
+}
+
+func daysSinceLastPlayed(nowEpoch, lastPlayed, addedAt int64) int {
+	if lastPlayed > 0 {
+		return int(math.Max(0, float64((nowEpoch-lastPlayed)/86400)))
+	}
+	if addedAt > 0 {
+		return int(math.Max(0, float64((nowEpoch-addedAt)/86400)))
+	}
+	return 999999
 }
 
 func clamp01(v float64) float64 {
