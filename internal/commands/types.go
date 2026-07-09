@@ -5,6 +5,7 @@ type arrItem struct {
 	Title            string `json:"title"`
 	Year             int    `json:"year"`
 	Status           string `json:"status"`
+	Network          string `json:"network"`
 	Monitored        bool   `json:"monitored"`
 	QualityProfileID int    `json:"qualityProfileId"`
 	Overview         string `json:"overview"`
@@ -12,6 +13,8 @@ type arrItem struct {
 	TMDBID           int    `json:"tmdbId"`
 	Seasons          []any  `json:"seasons"`
 	Images           []any  `json:"images"`
+	Tags             []int  `json:"tags"`
+	RootFolderPath   string `json:"rootFolderPath"`
 	SeriesID         int    `json:"seriesId"`
 	EpisodeNumber    int    `json:"episodeNumber"`
 	SeasonNumber     int    `json:"seasonNumber"`
@@ -20,6 +23,30 @@ type arrItem struct {
 	InCinemas        string `json:"inCinemas"`
 	PhysicalRelease  string `json:"physicalRelease"`
 	MovieFileID      int    `json:"movieFileId"`
+	MovieFile        *movieFile `json:"movieFile"`
+}
+
+type movieFile struct {
+	ID           int    `json:"id"`
+	RelativePath string `json:"relativePath"`
+	Path         string `json:"path"`
+	Size         int64  `json:"size"`
+	Quality      struct {
+		Quality struct {
+			Name string `json:"name"`
+		} `json:"quality"`
+	} `json:"quality"`
+}
+
+type episodeFile struct {
+	ID           int    `json:"id"`
+	RelativePath string `json:"relativePath"`
+	Path         string `json:"path"`
+}
+
+type tag struct {
+	ID    int    `json:"id"`
+	Label string `json:"label"`
 }
 
 type profile struct {

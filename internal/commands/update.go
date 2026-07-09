@@ -44,6 +44,12 @@ func updateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update arrctl to the latest release",
+		Long: `arrctl update - Update arrctl to the latest release binary
+
+This command downloads the latest published release for the current platform
+and replaces the installed executable.`,
+		Example: `  arrctl update
+  arrctl update --version v0.3.0`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			u, err := newUpdater()
 			if err != nil {

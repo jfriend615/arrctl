@@ -13,8 +13,19 @@ import (
 )
 
 func tautulliCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "tautulli"}
-	cmd.AddCommand(&cobra.Command{Use: "now", RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{
+		Use:   "tautulli",
+		Short: "View Plex activity via Tautulli",
+		Long: `arrctl tautulli - View Plex activity via Tautulli
+
+Commands:
+  now      Show who is currently streaming
+  stale    Show stale media candidates (rarely watched + old)`,
+		Example: `  arrctl tautulli now
+  arrctl tautulli stale
+  arrctl tautulli stale --library Movies --min-days 365 --max-plays 1 --min-size-gb 4`,
+	}
+	cmd.AddCommand(&cobra.Command{Use: "now", Short: "Show who is currently streaming", RunE: func(cmd *cobra.Command, args []string) error {
 		c, _, err := serviceClient("tautulli")
 		if err != nil {
 			return err
@@ -45,15 +56,17 @@ func tautulliCmd() *cobra.Command {
 		rows := [][]string{}
 		for _, s := range resp.Response.Data.Sessions {
 			rows = append(rows, output.ToStrings(
-				s["user"],
-				s["title"],
-				s["state"],
-				s["progress_percent"],
+				firstNonEmpty(s["user"], s["friendly_name"], "Unknown"),
+				firstNonEmpty(s["full_title"], s["title"], "Unknown"),
+				fmt.Sprintf("%s%%", firstNonEmpty(s["progress_percent"], 0)),
+				firstNonEmpty(s["video_full_resolution"], s["quality_profile"], "Unknown"),
+				firstNonEmpty(s["transcode_decision"], "Unknown"),
+				firstNonEmpty(s["state"], "Unknown"),
 			))
 		}
-		return render(resp.Response.Data.Sessions, []string{"User", "Title", "State", "Progress"}, rows)
+		return render(resp.Response.Data.Sessions, []string{"User", "Title", "Progress", "Quality", "Transcode", "State"}, rows)
 	}})
-	stale := &cobra.Command{Use: "stale", RunE: func(cmd *cobra.Command, args []string) error {
+	stale := &cobra.Command{Use: "stale", Short: "Show stale media candidates", RunE: func(cmd *cobra.Command, args []string) error {
 		c, _, err := serviceClient("tautulli")
 		if err != nil {
 			return exitErr(2, err)
@@ -63,6 +76,8 @@ func tautulliCmd() *cobra.Command {
 		maxPlays, _ := cmd.Flags().GetInt("max-plays")
 		minSize, _ := cmd.Flags().GetFloat64("min-size-gb")
 		limit, _ := cmd.Flags().GetInt("limit")
+		jsonFlag, _ := cmd.Flags().GetBool("json")
+		useJSON := format == "json" || jsonFlag
 		if limit <= 0 {
 			return exitErr(2, errors.New("--limit must be > 0"))
 		}
@@ -129,7 +144,7 @@ func tautulliCmd() *cobra.Command {
 				continue
 			}
 			sizeGB := math.Floor((float64(size)/1073741824)*100) / 100
-			staleScore := computeStaleScore(sizeGB, days, plays, maxPlays, last, added, now)
+			staleScore := (sizeGB * 0.6) + (float64(days)/365 * 0.3) + (float64((maxPlays+1)-plays) * 0.1)
 			it["file_size"] = size
 			it["play_count"] = plays
 			it["last_played"] = last
@@ -165,27 +180,45 @@ func tautulliCmd() *cobra.Command {
 			}
 			return exitErr(1, nil)
 		}
+		if useJSON {
+			return output.PrintJSON(out)
+		}
 		rows := [][]string{}
+		totalSize := int64(0)
 		for _, it := range out {
-			daysSincePlayed := fmt.Sprint(it["days_since_last_played"])
-			if toInt64(it["last_played"]) <= 0 {
-				daysSincePlayed = "Never"
+			totalSize += toInt64(it["file_size"])
+			lastPlayed := "Never"
+			if toInt64(it["last_played"]) > 0 {
+				lastPlayed = time.Unix(toInt64(it["last_played"]), 0).Format("2006-01-02")
+			}
+			dateAdded := "Unknown"
+			if toInt64(it["added_at"]) > 0 {
+				dateAdded = time.Unix(toInt64(it["added_at"]), 0).Format("2006-01-02")
 			}
 			rows = append(rows, output.ToStrings(
-				firstNonEmpty(it["title"], it["sort_title"], "Unknown"),
 				firstNonEmpty(it["section_name"], it["library_name"], "Unknown"),
-				daysSincePlayed,
-				it["play_count"],
+				firstNonEmpty(it["media_type"], "unknown"),
+				firstNonEmpty(it["title"], it["sort_title"], "Unknown"),
 				fmt.Sprintf("%.2f", it["size_gb"]),
+				it["play_count"],
+				lastPlayed,
+				dateAdded,
 			))
 		}
-		return render(out, []string{"Title", "Library", "Days Since Played", "Plays", "Size (GB)"}, rows)
+		if err := render(out, []string{"Library", "Type", "Title", "Size(GB)", "Plays", "Last Played", "Date Added"}, rows); err != nil {
+			return err
+		}
+		if output.IsTable(output.Mode(format)) && !quiet {
+			fmt.Fprintf(cmd.ErrOrStderr(), "%d stale candidate(s) | total size: %.2f GiB\n", len(out), float64(totalSize)/1073741824)
+		}
+		return nil
 	}}
 	stale.Flags().String("library", "", "")
 	stale.Flags().Int("min-days", 180, "")
 	stale.Flags().Int("max-plays", 2, "")
 	stale.Flags().Float64("min-size-gb", 1, "")
 	stale.Flags().Int("limit", 50, "")
+	stale.Flags().Bool("json", false, "")
 	cmd.AddCommand(stale)
 	return cmd
 }

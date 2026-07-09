@@ -42,29 +42,44 @@ func Execute() {
 }
 
 func rootCmd() *cobra.Command {
-	root := &cobra.Command{Use: "arrctl", Short: "Unified CLI for *arr", SilenceUsage: true}
+	root := &cobra.Command{
+		Use:           "arrctl",
+		Short:         "Unified CLI for *arr",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		Long: `arrctl - Unified CLI for managing *arr services
+
+Commands:
+  sonarr      Manage Sonarr (TV shows)
+  radarr      Manage Radarr (Movies)
+  overseerr   Manage Overseerr (Requests)
+  tautulli    View Plex activity (who is streaming)
+  calendar    Show upcoming releases (TV + Movies)
+  completion  Manage shell completion scripts
+  update      Update arrctl to the latest release
+
+Configuration:
+  Default config: ~/.config/arrctl/config.json
+  Or set environment variables:
+    ARRCTL_CONFIG
+    SONARR_URL / SONARR_API_KEY
+    RADARR_URL / RADARR_API_KEY
+    OVERSEERR_URL / OVERSEERR_API_KEY
+    TAUTULLI_URL / TAUTULLI_API_KEY`,
+		Example: `  arrctl sonarr list
+  arrctl sonarr search "Breaking Bad"
+  arrctl radarr add --id 603 --search
+  arrctl overseerr pending
+  arrctl tautulli stale --library Movies --min-days 365 --max-plays 1
+  arrctl calendar --days 14 --sonarr
+  arrctl completion --install`,
+	}
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.SetHelpCommand(&cobra.Command{Hidden: true})
 	root.PersistentFlags().StringVar(&cfgPath, "config", "", "Config file")
 	root.PersistentFlags().StringVar(&format, "format", "auto", "json|table|auto")
 	root.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Quiet mode")
 	root.Version = version
 	root.AddCommand(sonarrCmd(), radarrCmd(), overseerrCmd(), tautulliCmd(), calendarCmd(), completionCmd(root), updateCmd())
 	return root
-}
-
-func completionCmd(root *cobra.Command) *cobra.Command {
-	cmd := &cobra.Command{Use: "completion [bash|zsh|fish|powershell]", Short: "Generate shell completion", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		switch args[0] {
-		case "bash":
-			return root.GenBashCompletion(os.Stdout)
-		case "zsh":
-			return root.GenZshCompletion(os.Stdout)
-		case "fish":
-			return root.GenFishCompletion(os.Stdout, true)
-		case "powershell":
-			return root.GenPowerShellCompletion(os.Stdout)
-		default:
-			return fmt.Errorf("unsupported shell")
-		}
-	}}
-	return cmd
 }

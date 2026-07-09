@@ -13,7 +13,7 @@ import (
 func arrCalendarCmd(service string, sonarr bool) *cobra.Command {
 	var days int
 	var start, end string
-	cmd := &cobra.Command{Use: "calendar", RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: "calendar", Short: "Show service-specific upcoming releases", RunE: func(cmd *cobra.Command, args []string) error {
 		if start == "" {
 			start = time.Now().Format("2006-01-02")
 		}
@@ -39,7 +39,21 @@ func arrCalendarCmd(service string, sonarr bool) *cobra.Command {
 func calendarCmd() *cobra.Command {
 	var days int
 	var week, onlySonarr, onlyRadarr bool
-	cmd := &cobra.Command{Use: "calendar", RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{
+		Use:   "calendar",
+		Short: "Show upcoming releases from Sonarr and Radarr",
+		Long: `arrctl calendar - Unified calendar view for upcoming releases
+
+Options:
+  --days N    Show the next N days (default: 7)
+  --week      Show this week (Monday to Sunday)
+  --sonarr    Show only TV episodes
+  --radarr    Show only movies`,
+		Example: `  arrctl calendar
+  arrctl calendar --week
+  arrctl calendar --days 14 --sonarr
+  arrctl calendar --radarr`,
+		RunE: func(cmd *cobra.Command, args []string) error {
 		start, end := calendarRange(time.Now(), days, week)
 		svcs := []string{"sonarr", "radarr"}
 		if onlySonarr {
@@ -98,7 +112,11 @@ func fetchServiceCalendar(ctx context.Context, service string, sonarr bool, star
 			if t == "" {
 				t = "Unknown Series"
 			}
-			rows = append(rows, calendarRow{Date: strings.Split(e.AirDateUTC, "T")[0], Title: t, Episode: fmt.Sprintf("S%02dE%02d", e.SeasonNumber, e.EpisodeNumber), Service: "Sonarr"})
+			ep := fmt.Sprintf("S%02dE%02d", e.SeasonNumber, e.EpisodeNumber)
+			if e.Title != "" {
+				ep += " - " + e.Title
+			}
+			rows = append(rows, calendarRow{Date: strings.Split(e.AirDateUTC, "T")[0], Title: t, Episode: ep, Service: "Sonarr"})
 		}
 	} else {
 		for _, m := range items {

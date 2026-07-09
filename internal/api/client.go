@@ -48,12 +48,12 @@ func (c *Client) Do(ctx context.Context, method, endpoint string, in any, out an
 	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		if resp.StatusCode == http.StatusUnauthorized {
-			return fmt.Errorf("authentication failed")
+			return fmt.Errorf("Authentication failed")
 		}
 		if resp.StatusCode == http.StatusNotFound {
-			return fmt.Errorf("not found: %s", endpoint)
+			return fmt.Errorf("Not found: %s", endpoint)
 		}
-		return fmt.Errorf("api request failed (HTTP %d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		return fmt.Errorf("API request failed (HTTP %d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
 	if out != nil && len(b) > 0 {
 		return json.Unmarshal(b, out)
@@ -79,7 +79,7 @@ func (c *Client) Tautulli(ctx context.Context, cmd string, params map[string]str
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return fmt.Errorf("tautulli request failed (HTTP %d)", resp.StatusCode)
+		return fmt.Errorf("Tautulli request failed (HTTP %d)", resp.StatusCode)
 	}
 	if out != nil {
 		return json.Unmarshal(b, out)
