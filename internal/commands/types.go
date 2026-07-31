@@ -1,28 +1,28 @@
 package commands
 
 type arrItem struct {
-	ID               int    `json:"id"`
-	Title            string `json:"title"`
-	Year             int    `json:"year"`
-	Status           string `json:"status"`
-	Network          string `json:"network"`
-	Monitored        bool   `json:"monitored"`
-	QualityProfileID int    `json:"qualityProfileId"`
-	Overview         string `json:"overview"`
-	TVDBID           int    `json:"tvdbId"`
-	TMDBID           int    `json:"tmdbId"`
-	Seasons          []any  `json:"seasons"`
-	Images           []any  `json:"images"`
-	Tags             []int  `json:"tags"`
-	RootFolderPath   string `json:"rootFolderPath"`
-	SeriesID         int    `json:"seriesId"`
-	EpisodeNumber    int    `json:"episodeNumber"`
-	SeasonNumber     int    `json:"seasonNumber"`
-	AirDateUTC       string `json:"airDateUtc"`
-	DigitalRelease   string `json:"digitalRelease"`
-	InCinemas        string `json:"inCinemas"`
-	PhysicalRelease  string `json:"physicalRelease"`
-	MovieFileID      int    `json:"movieFileId"`
+	ID               int        `json:"id"`
+	Title            string     `json:"title"`
+	Year             int        `json:"year"`
+	Status           string     `json:"status"`
+	Network          string     `json:"network"`
+	Monitored        bool       `json:"monitored"`
+	QualityProfileID int        `json:"qualityProfileId"`
+	Overview         string     `json:"overview"`
+	TVDBID           int        `json:"tvdbId"`
+	TMDBID           int        `json:"tmdbId"`
+	Seasons          []any      `json:"seasons"`
+	Images           []any      `json:"images"`
+	Tags             []int      `json:"tags"`
+	RootFolderPath   string     `json:"rootFolderPath"`
+	SeriesID         int        `json:"seriesId"`
+	EpisodeNumber    int        `json:"episodeNumber"`
+	SeasonNumber     int        `json:"seasonNumber"`
+	AirDateUTC       string     `json:"airDateUtc"`
+	DigitalRelease   string     `json:"digitalRelease"`
+	InCinemas        string     `json:"inCinemas"`
+	PhysicalRelease  string     `json:"physicalRelease"`
+	MovieFileID      int        `json:"movieFileId"`
 	MovieFile        *movieFile `json:"movieFile"`
 }
 

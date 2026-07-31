@@ -45,6 +45,7 @@ func updateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Update arrctl to the latest release",
+		Args:  cobra.NoArgs,
 		Long: `arrctl update - Update arrctl to the latest release binary
 
 This command downloads the latest published release for the current platform
@@ -87,13 +88,6 @@ func newUpdater() (*updater, error) {
 	exe, err := updateExecutable()
 	if err != nil {
 		return nil, fmt.Errorf("resolve executable path: %w", err)
-	}
-	symlinked, err := executableIsSymlink(exe)
-	if err != nil {
-		return nil, err
-	}
-	if symlinked {
-		return nil, fmt.Errorf("refusing to update symlinked executable: %s", exe)
 	}
 	resolvedExe, err := resolveExecutableTarget(exe)
 	if err != nil {
@@ -269,18 +263,7 @@ func resolveExecutableTarget(exe string) (string, error) {
 	if err == nil {
 		return resolved, nil
 	}
-	if errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("resolve executable target %s: %w", exe, err)
-	}
-	return exe, nil
-}
-
-func executableIsSymlink(exe string) (bool, error) {
-	info, err := os.Lstat(exe)
-	if err != nil {
-		return false, fmt.Errorf("stat executable path %s: %w", exe, err)
-	}
-	return info.Mode()&os.ModeSymlink != 0, nil
+	return "", fmt.Errorf("resolve executable target %s: %w", exe, err)
 }
 
 func verifyChecksum(archivePath, checksumPath, archiveName string) error {

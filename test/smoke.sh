@@ -136,6 +136,7 @@ test_case "arrctl overseerr help works" "$ARRCTL" overseerr help
 test_case "arrctl calendar --help works" "$ARRCTL" calendar --help
 test_case "arrctl calendar help works" "$ARRCTL" calendar help
 test_case "arrctl completion --help works" "$ARRCTL" completion --help
+test_case "arrctl completion help works" "$ARRCTL" completion help
 
 # Invalid command handling
 printf '\n%s\n' "--- Error Handling ---"

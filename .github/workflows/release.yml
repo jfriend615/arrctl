@@ -30,6 +30,9 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Run Go CLI smoke tests
+        run: make test-shell
+
   build:
     needs: test
     runs-on: ubuntu-latest

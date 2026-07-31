@@ -50,6 +50,7 @@ test_case "arrctl tautulli --help works" "$ARRCTL" tautulli --help
 test_case "arrctl overseerr --help works" "$ARRCTL" overseerr --help
 test_case "arrctl calendar --help works" "$ARRCTL" calendar --help
 test_case "arrctl completion --help works" "$ARRCTL" completion --help
+test_case "arrctl completion help works" "$ARRCTL" completion help
 
 test_case_fail_contains "invalid format is rejected" "invalid format" "$ARRCTL" --format yaml sonarr list
 test_case_fail_contains "conflicting monitored flags are rejected" "cannot be used together" "$ARRCTL" sonarr list --monitored --unmonitored

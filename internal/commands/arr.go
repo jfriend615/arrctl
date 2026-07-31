@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/jfriend615/arrctl/internal/api"
@@ -44,6 +46,10 @@ Commands:
 		Use:   service,
 		Short: short,
 		Long:  long,
+		Args:  parentCommandArgs(service),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
 		Example: fmt.Sprintf(`  arrctl %s list
   arrctl %s search "Example"
   arrctl %s info --name "Example"`, service, service, service),
@@ -54,7 +60,7 @@ Commands:
 
 func arrListCmd(service, noun string) *cobra.Command {
 	var monitored, unmonitored bool
-	cmd := &cobra.Command{Use: "list", Short: "List library items", RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: "list", Short: "List library items", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		if monitored && unmonitored {
 			return errors.New("--monitored and --unmonitored cannot be used together")
 		}
@@ -62,49 +68,30 @@ func arrListCmd(service, noun string) *cobra.Command {
 		if err != nil {
 			return err
 		}
-		if format == "json" {
-			var raw []map[string]any
-			if err := c.Do(cmd.Context(), "GET", "/api/v3/"+noun, nil, &raw); err != nil {
-				return err
-			}
-			filtered := make([]map[string]any, 0, len(raw))
-			for _, it := range raw {
-				monitoredVal := false
-				if v, ok := it["monitored"].(bool); ok {
-					monitoredVal = v
-				}
-				if monitored && !monitoredVal {
-					continue
-				}
-				if unmonitored && monitoredVal {
-					continue
-				}
-				filtered = append(filtered, it)
-			}
-			return output.PrintJSON(filtered)
-		}
-		var items []arrItem
-		if err := c.Do(cmd.Context(), "GET", "/api/v3/"+noun, nil, &items); err != nil {
+		var raw []map[string]any
+		if err := c.Do(cmd.Context(), "GET", "/api/v3/"+noun, nil, &raw); err != nil {
 			return err
 		}
-		filtered := make([]arrItem, 0, len(items))
-		for _, it := range items {
-			if monitored && !it.Monitored {
+		filtered := make([]map[string]any, 0, len(raw))
+		for _, it := range raw {
+			monitoredValue, _ := it["monitored"].(bool)
+			if monitored && !monitoredValue {
 				continue
 			}
-			if unmonitored && it.Monitored {
+			if unmonitored && monitoredValue {
 				continue
 			}
 			filtered = append(filtered, it)
 		}
 		rows := [][]string{}
 		for _, it := range filtered {
-			rows = append(rows, output.ToStrings(it.ID, it.Title, it.Year, it.Status, map[bool]string{true: "Yes", false: "No"}[it.Monitored]))
+			monitoredValue, _ := it["monitored"].(bool)
+			rows = append(rows, output.ToStrings(it["id"], it["title"], it["year"], it["status"], map[bool]string{true: "Yes", false: "No"}[monitoredValue]))
 		}
 		return render(filtered, []string{"ID", "Title", "Year", "Status", "Monitored"}, rows)
 	}}
-	cmd.Flags().BoolVar(&monitored, "monitored", false, "")
-	cmd.Flags().BoolVar(&unmonitored, "unmonitored", false, "")
+	cmd.Flags().BoolVar(&monitored, "monitored", false, "Show only monitored items")
+	cmd.Flags().BoolVar(&unmonitored, "unmonitored", false, "Show only unmonitored items")
 	return cmd
 }
 
@@ -119,17 +106,7 @@ func arrSearchCmd(service, noun string) *cobra.Command {
 			return err
 		}
 		term := url.QueryEscape(strings.Join(args, " "))
-		if format == "json" {
-			var raw []map[string]any
-			if err := c.Do(cmd.Context(), "GET", fmt.Sprintf("/api/v3/%s/lookup?term=%s", noun, term), nil, &raw); err != nil {
-				return err
-			}
-			if len(raw) > limit {
-				raw = raw[:limit]
-			}
-			return output.PrintJSON(raw)
-		}
-		var items []arrItem
+		var items []map[string]any
 		if err := c.Do(cmd.Context(), "GET", fmt.Sprintf("/api/v3/%s/lookup?term=%s", noun, term), nil, &items); err != nil {
 			return err
 		}
@@ -138,30 +115,30 @@ func arrSearchCmd(service, noun string) *cobra.Command {
 		}
 		rows := [][]string{}
 		for _, it := range items {
-			id := it.TVDBID
+			id := it["tvdbId"]
 			if noun == "movie" {
-				id = it.TMDBID
+				id = it["tmdbId"]
 			}
 			if noun == "series" {
-				rows = append(rows, output.ToStrings(id, it.Title, it.Year, it.Network, it.Status))
+				rows = append(rows, output.ToStrings(id, it["title"], it["year"], firstNonEmpty(it["network"], "N/A"), it["status"]))
 				continue
 			}
-			rows = append(rows, output.ToStrings(id, it.Title, it.Year, it.Status))
+			rows = append(rows, output.ToStrings(id, it["title"], it["year"], it["status"]))
 		}
 		h := []string{"TVDB ID", "Title", "Year", "Network", "Status"}
 		if noun == "movie" {
-			h = []string{"TMDB ID", "Title", "Year", "Status"}
+			h = []string{"TMDb ID", "Title", "Year", "Status"}
 		}
 		return render(items, h, rows)
 	}}
-	cmd.Flags().IntVar(&limit, "limit", 10, "")
+	cmd.Flags().IntVar(&limit, "limit", 10, "Maximum number of results")
 	return cmd
 }
 
 func arrAddCmd(service, noun, idType string) *cobra.Command {
 	var id, quality, root string
 	var search, monitored bool
-	cmd := &cobra.Command{Use: "add", Short: "Add media to the library", RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: "add", Short: "Add media to the library", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		if id == "" {
 			return errors.New("--id required")
 		}
@@ -228,12 +205,12 @@ func arrAddCmd(service, noun, idType string) *cobra.Command {
 		}
 		return nil
 	}}
-	cmd.Flags().StringVar(&id, "id", "", "")
-	cmd.Flags().StringVar(&quality, "quality", "", "")
-	cmd.Flags().StringVar(&root, "root", "", "")
-	cmd.Flags().BoolVar(&search, "search", false, "")
-	cmd.Flags().BoolVar(&monitored, "monitored", true, "")
-	cmd.Flags().Bool("no-monitored", false, "")
+	cmd.Flags().StringVar(&id, "id", "", strings.ToUpper(idType)+" ID to add")
+	cmd.Flags().StringVar(&quality, "quality", "", "Quality profile name or ID")
+	cmd.Flags().StringVar(&root, "root", "", "Root folder path")
+	cmd.Flags().BoolVar(&search, "search", false, "Start a search after adding")
+	cmd.Flags().BoolVar(&monitored, "monitored", true, "Monitor the added item")
+	cmd.Flags().Bool("no-monitored", false, "Do not monitor the added item")
 	cmd.PreRun = func(cmd *cobra.Command, args []string) {
 		if v, _ := cmd.Flags().GetBool("no-monitored"); v {
 			monitored = false
@@ -243,14 +220,22 @@ func arrAddCmd(service, noun, idType string) *cobra.Command {
 }
 
 func arrInfoCmd(service, noun string) *cobra.Command {
-	var id int
+	var id string
 	var name string
-	cmd := &cobra.Command{Use: "info", Short: "Show detailed information", RunE: func(cmd *cobra.Command, args []string) error {
-		if id != 0 && name != "" {
-			return errors.New("use either --id or --name, not both")
+	cmd := &cobra.Command{Use: "info", Short: "Show detailed information", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+		if id != "" && name != "" {
+			return errors.New("Use either --id or --name, not both")
 		}
-		if id == 0 && name == "" {
-			return errors.New("either --id or --name is required")
+		if id == "" && name == "" {
+			return errors.New("Either --id or --name is required")
+		}
+		parsedID := 0
+		if id != "" {
+			var err error
+			parsedID, err = parseMediaID(id, service, noun)
+			if err != nil {
+				return err
+			}
 		}
 		c, _, err := serviceClient(service)
 		if err != nil {
@@ -262,7 +247,7 @@ func arrInfoCmd(service, noun string) *cobra.Command {
 		}
 		matched := []arrItem{}
 		for _, it := range items {
-			if id != 0 && it.ID == id {
+			if id != "" && it.ID == parsedID {
 				matched = append(matched, it)
 			}
 			if name != "" && strings.Contains(strings.ToLower(it.Title), strings.ToLower(name)) {
@@ -277,14 +262,14 @@ func arrInfoCmd(service, noun string) *cobra.Command {
 		}
 		return renderMovieInfo(cmd, c, matched)
 	}}
-	cmd.Flags().IntVar(&id, "id", 0, "")
-	cmd.Flags().StringVar(&name, "name", "", "")
+	cmd.Flags().StringVar(&id, "id", "", "Exact library item ID")
+	cmd.Flags().StringVar(&name, "name", "", "Partial title match")
 	return cmd
 }
 
 func renderSeriesInfo(cmd *cobra.Command, c *api.Client, matched []arrItem) error {
 	ctx := cmd.Context()
-	profiles, tags, err := loadProfileAndTagLookups(ctx, c)
+	profiles, err := loadProfileLookup(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -295,21 +280,6 @@ func renderSeriesInfo(cmd *cobra.Command, c *api.Client, matched []arrItem) erro
 		if err := c.Do(ctx, "GET", fmt.Sprintf("/api/v3/episode?seriesId=%d", it.ID), nil, &episodes); err != nil {
 			return err
 		}
-		var episodeFiles []episodeFile
-		if err := c.Do(ctx, "GET", fmt.Sprintf("/api/v3/episodefile?seriesId=%d", it.ID), nil, &episodeFiles); err != nil {
-			return err
-		}
-		files := make([]string, 0, len(episodeFiles))
-		for _, ef := range episodeFiles {
-			switch {
-			case ef.RelativePath != "":
-				files = append(files, ef.RelativePath)
-			case ef.Path != "":
-				files = append(files, ef.Path)
-			default:
-				files = append(files, fmt.Sprintf("ID:%d", ef.ID))
-			}
-		}
 		entry := map[string]any{
 			"id":                 it.ID,
 			"title":              it.Title,
@@ -317,12 +287,9 @@ func renderSeriesInfo(cmd *cobra.Command, c *api.Client, matched []arrItem) erro
 			"status":             it.Status,
 			"monitored":          it.Monitored,
 			"qualityProfileName": profiles[it.QualityProfileID],
-			"rootFolder":         it.RootFolderPath,
 			"overview":           it.Overview,
-			"tags":               tagLabels(it.Tags, tags),
 			"seasonsCount":       len(it.Seasons),
 			"episodesCount":      len(episodes),
-			"episodeFiles":       files,
 		}
 		if entry["qualityProfileName"] == "" {
 			entry["qualityProfileName"] = "Unknown"
@@ -335,36 +302,29 @@ func renderSeriesInfo(cmd *cobra.Command, c *api.Client, matched []arrItem) erro
 			it.Status,
 			map[bool]string{true: "Yes", false: "No"}[it.Monitored],
 			entry["qualityProfileName"],
-			it.RootFolderPath,
 			len(it.Seasons),
 			len(episodes),
-			strings.Join(entry["tags"].([]string), ", "),
-			strings.Join(files, ", "),
 			it.Overview,
 		))
 	}
-	return render(out, []string{"ID", "Title", "Year", "Status", "Monitored", "Quality Profile", "Root Folder", "Seasons", "Episodes", "Tags", "Episode Files", "Overview"}, rows)
+	return render(out, []string{"ID", "Title", "Year", "Status", "Monitored", "Quality Profile", "Seasons", "Episodes", "Overview"}, rows)
 }
 
 func renderMovieInfo(cmd *cobra.Command, c *api.Client, matched []arrItem) error {
 	ctx := cmd.Context()
-	profiles, tags, err := loadProfileAndTagLookups(ctx, c)
+	profiles, err := loadProfileLookup(ctx, c)
 	if err != nil {
 		return err
 	}
 	out := make([]map[string]any, 0, len(matched))
 	rows := make([][]string, 0, len(matched))
 	for _, it := range matched {
-		var mf *movieFile
-		movieFileID := 0
-		switch {
-		case it.MovieFile != nil && it.MovieFile.ID != 0:
-			mf = it.MovieFile
+		mf := it.MovieFile
+		movieFileID := it.MovieFileID
+		if mf != nil && mf.ID != 0 {
 			movieFileID = mf.ID
-		case it.MovieFileID != 0:
-			movieFileID = it.MovieFileID
 		}
-		if movieFileID != 0 && mf == nil {
+		if movieFileID != 0 {
 			var fetched movieFile
 			if err := c.Do(ctx, "GET", fmt.Sprintf("/api/v3/moviefile/%d", movieFileID), nil, &fetched); err != nil {
 				return err
@@ -378,10 +338,8 @@ func renderMovieInfo(cmd *cobra.Command, c *api.Client, matched []arrItem) error
 			"status":             it.Status,
 			"monitored":          it.Monitored,
 			"qualityProfileName": profiles[it.QualityProfileID],
-			"rootFolder":         it.RootFolderPath,
 			"overview":           it.Overview,
-			"tags":               tagLabels(it.Tags, tags),
-			"movieFile":          mf,
+			"movieSizeGb":        movieSizeGB(mf),
 		}
 		if entry["qualityProfileName"] == "" {
 			entry["qualityProfileName"] = "Unknown"
@@ -394,83 +352,60 @@ func renderMovieInfo(cmd *cobra.Command, c *api.Client, matched []arrItem) error
 			it.Status,
 			map[bool]string{true: "Yes", false: "No"}[it.Monitored],
 			entry["qualityProfileName"],
-			it.RootFolderPath,
-			strings.Join(entry["tags"].([]string), ", "),
-			formatMovieFileSummary(mf),
+			formatMovieSize(entry["movieSizeGb"]),
 			it.Overview,
 		))
 	}
-	return render(out, []string{"ID", "Title", "Year", "Status", "Monitored", "Quality Profile", "Root Folder", "Tags", "Movie File", "Overview"}, rows)
+	return render(out, []string{"ID", "Title", "Year", "Status", "Monitored", "Quality Profile", "Size (GB)", "Overview"}, rows)
 }
 
-func loadProfileAndTagLookups(ctx context.Context, c *api.Client) (map[int]string, map[int]string, error) {
+func loadProfileLookup(ctx context.Context, c *api.Client) (map[int]string, error) {
 	var profiles []profile
 	if err := c.Do(ctx, "GET", "/api/v3/qualityprofile", nil, &profiles); err != nil {
-		return nil, nil, err
-	}
-	var tags []tag
-	if err := c.Do(ctx, "GET", "/api/v3/tag", nil, &tags); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	profileLookup := make(map[int]string, len(profiles))
 	for _, p := range profiles {
 		profileLookup[p.ID] = p.Name
 	}
-	tagLookup := make(map[int]string, len(tags))
-	for _, t := range tags {
-		tagLookup[t.ID] = t.Label
-	}
-	return profileLookup, tagLookup, nil
+	return profileLookup, nil
 }
 
-func tagLabels(ids []int, lookup map[int]string) []string {
-	if len(ids) == 0 {
-		return []string{}
-	}
-	out := make([]string, 0, len(ids))
-	for _, id := range ids {
-		if label := lookup[id]; label != "" {
-			out = append(out, label)
-		} else {
-			out = append(out, fmt.Sprintf("Tag-%d", id))
-		}
-	}
-	return out
-}
-
-func formatMovieFileSummary(mf *movieFile) string {
+func movieSizeGB(mf *movieFile) any {
 	if mf == nil {
+		return nil
+	}
+	return math.Round(float64(mf.Size)/1073741824*10) / 10
+}
+
+func formatMovieSize(v any) string {
+	if v == nil {
 		return "Not Downloaded"
 	}
-	path := mf.RelativePath
-	if path == "" {
-		path = mf.Path
-	}
-	sizeGB := math.Floor(float64(mf.Size) / 1073741824)
-	quality := mf.Quality.Quality.Name
-	if quality == "" {
-		quality = "Unknown"
-	}
-	return fmt.Sprintf("%s | %.0f GB | %s", path, sizeGB, quality)
+	return fmt.Sprintf("%v GB", v)
 }
 
 func arrDeleteCmd(service, noun string) *cobra.Command {
-	var id int
+	var id string
 	var deleteFiles, addExclusion, yes bool
-	cmd := &cobra.Command{Use: "delete", Short: "Delete media from the library", RunE: func(cmd *cobra.Command, args []string) error {
-		if id == 0 {
-			return errors.New("--id required")
+	cmd := &cobra.Command{Use: "delete", Short: "Delete media from the library", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+		if id == "" {
+			return errors.New("--id is required")
+		}
+		parsedID, err := parseMediaID(id, service, noun)
+		if err != nil {
+			return err
 		}
 		c, _, err := serviceClient(service)
 		if err != nil {
 			return err
 		}
 		var current arrItem
-		if err := c.Do(cmd.Context(), "GET", fmt.Sprintf("/api/v3/%s/%d", noun, id), nil, &current); err != nil {
+		if err := c.Do(cmd.Context(), "GET", fmt.Sprintf("/api/v3/%s/%d", noun, parsedID), nil, &current); err != nil {
 			return err
 		}
 		if !yes {
-			confirmed, err := confirmDeletion(service, noun, current.Title, id)
+			confirmed, err := confirmDeletion(service, noun, current.Title, parsedID, cmd.ErrOrStderr())
 			if err != nil {
 				return err
 			}
@@ -481,15 +416,15 @@ func arrDeleteCmd(service, noun string) *cobra.Command {
 				return nil
 			}
 		}
-		ep := fmt.Sprintf("/api/v3/%s/%d?deleteFiles=%t&addImportListExclusion=%t", noun, id, deleteFiles, addExclusion)
+		ep := fmt.Sprintf("/api/v3/%s/%d?deleteFiles=%t&addImportListExclusion=%t", noun, parsedID, deleteFiles, addExclusion)
 		if err := c.Do(cmd.Context(), "DELETE", ep, nil, nil); err != nil {
 			return err
 		}
 		if format == "json" {
-			return output.PrintJSON(map[string]any{
+			return printJSON(map[string]any{
 				"service":                service,
 				"deleted":                true,
-				"id":                     id,
+				"id":                     parsedID,
 				"title":                  current.Title,
 				"deleteFiles":            deleteFiles,
 				"addImportListExclusion": addExclusion,
@@ -500,27 +435,31 @@ func arrDeleteCmd(service, noun string) *cobra.Command {
 			if label == "" {
 				label = noun
 			}
-			fmt.Fprintf(os.Stderr, "Deleted %s %s: %s (ID: %d)\n", strings.Title(service), label, current.Title, id)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Deleted %s %s: %s (ID: %d)\n", strings.Title(service), label, current.Title, parsedID)
 		}
 		return nil
 	}}
-	cmd.Flags().IntVar(&id, "id", 0, "")
-	cmd.Flags().BoolVar(&deleteFiles, "delete-files", false, "")
-	cmd.Flags().BoolVar(&addExclusion, "add-exclusion", false, "")
-	cmd.Flags().BoolVar(&yes, "yes", false, "")
+	cmd.Flags().StringVar(&id, "id", "", "Library item ID to delete")
+	cmd.Flags().BoolVar(&deleteFiles, "delete-files", false, "Also delete media files from disk")
+	cmd.Flags().BoolVar(&addExclusion, "add-exclusion", false, "Add an import-list exclusion")
+	cmd.Flags().BoolVar(&yes, "yes", false, "Skip the confirmation prompt")
 	return cmd
 }
 
-func confirmDeletion(service, noun, title string, id int) (bool, error) {
-	reader := bufio.NewReader(os.Stdin)
-	if fi, err := os.Stdin.Stat(); err == nil && (fi.Mode()&os.ModeCharDevice) == 0 {
-		tty, err := os.Open("/dev/tty")
-		if err == nil {
-			defer tty.Close()
-			reader = bufio.NewReader(tty)
-		}
+func confirmDeletion(service, noun, title string, id int, prompt io.Writer) (bool, error) {
+	return confirmDeletionWithTTY(service, noun, title, id, func() (io.ReadCloser, error) {
+		return os.Open("/dev/tty")
+	}, prompt)
+}
+
+func confirmDeletionWithTTY(service, noun, title string, id int, openTTY func() (io.ReadCloser, error), prompt io.Writer) (bool, error) {
+	tty, err := openTTY()
+	if err != nil {
+		return false, errors.New("cannot prompt without a terminal; use --yes")
 	}
-	fmt.Fprintf(os.Stderr, "Delete %s %s %q (ID: %d)? [y/N]: ", strings.Title(service), noun, title, id)
+	defer tty.Close()
+	reader := bufio.NewReader(tty)
+	fmt.Fprintf(prompt, "Delete %s %s %q (ID: %d)? [y/N]: ", strings.Title(service), noun, title, id)
 	line, err := reader.ReadString('\n')
 	if err != nil && len(line) == 0 {
 		return false, err
@@ -531,4 +470,22 @@ func confirmDeletion(service, noun, title string, id int) (bool, error) {
 	default:
 		return false, nil
 	}
+}
+
+func parseMediaID(raw, service, noun string) (int, error) {
+	label := map[string]string{
+		"sonarr": "Sonarr series",
+		"radarr": "Radarr movie",
+	}[service]
+	if label == "" {
+		label = strings.Title(service) + " " + noun
+	}
+	if raw == "" || strings.Trim(raw, "0123456789") != "" {
+		return 0, fmt.Errorf("--id must be a numeric %s ID", label)
+	}
+	id, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("--id must be a numeric %s ID", label)
+	}
+	return id, nil
 }

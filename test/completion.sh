@@ -17,6 +17,10 @@ fail() {
 
 grep -q '__start_arrctl' "$TMP_COMPLETION" || fail "bash completion output should define __start_arrctl"
 grep -q 'complete .*__start_arrctl arrctl' "$TMP_COMPLETION" || fail "bash completion output should register arrctl"
+grep -q -- '--delete-files' "$TMP_COMPLETION" || fail "bash completion should include delete file cleanup flags"
+grep -q -- '--add-exclusion' "$TMP_COMPLETION" || fail "bash completion should include Radarr exclusion flags"
+grep -q -- '--no-monitored' "$TMP_COMPLETION" || fail "bash completion should include monitored filters"
+grep -q -- '--min-days' "$TMP_COMPLETION" || fail "bash completion should include Tautulli stale thresholds"
 
 # Install command should be idempotent
 TMP_HOME="$(mktemp -d)"

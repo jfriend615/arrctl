@@ -1,8 +1,9 @@
 # arrctl Makefile
 # Convenience targets for development and installation
 
-ARRCTL_TEST_BIN := /private/tmp/arrctl-test-bin
-GOCACHE ?= /private/tmp/arrctl-go-build-cache
+TMPDIR ?= /tmp
+ARRCTL_TEST_BIN ?= $(TMPDIR)/arrctl-test-bin
+GOCACHE ?= $(TMPDIR)/arrctl-go-build-cache
 
 .PHONY: install uninstall test test-go test-shell lint clean help
 
@@ -39,11 +40,14 @@ test-go:
 	@GOCACHE=$(GOCACHE) go test ./...
 
 test-shell:
-	@GOCACHE=$(GOCACHE) go build -buildvcs=false -o $(ARRCTL_TEST_BIN) ./cmd/arrctl
-	@chmod +x test/smoke.sh test/completion.sh test/go-smoke.sh test/install-smoke.sh
-	@ARRCTL_BIN=$(ARRCTL_TEST_BIN) ./test/go-smoke.sh
-	@ARRCTL_BIN=$(ARRCTL_TEST_BIN) ./test/completion.sh
-	@./test/install-smoke.sh
+	@set -e; \
+		trap 'rm -f "$(ARRCTL_TEST_BIN)"' EXIT INT TERM; \
+		GOCACHE="$(GOCACHE)" go build -buildvcs=false -o "$(ARRCTL_TEST_BIN)" ./cmd/arrctl; \
+		chmod +x test/smoke.sh test/completion.sh test/go-smoke.sh test/install-smoke.sh; \
+		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/go-smoke.sh; \
+		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/smoke.sh; \
+		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/completion.sh; \
+		./test/install-smoke.sh
 
 lint:
 	@echo "Running shellcheck..."

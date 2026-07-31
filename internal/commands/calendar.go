@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,10 +12,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var fetchCalendarForUnified = fetchServiceCalendar
+
+type calendarFetchError struct {
+	service string
+	err     error
+}
+
+func (e calendarFetchError) Error() string {
+	return fmt.Sprintf("%s calendar fetch: %v", e.service, e.err)
+}
+func (e calendarFetchError) Unwrap() error { return e.err }
+
+func isCalendarFetchError(err error) bool {
+	var target calendarFetchError
+	return errors.As(err, &target)
+}
+
 func arrCalendarCmd(service string, sonarr bool) *cobra.Command {
 	var days int
 	var start, end string
-	cmd := &cobra.Command{Use: "calendar", Short: "Show service-specific upcoming releases", RunE: func(cmd *cobra.Command, args []string) error {
+	cmd := &cobra.Command{Use: "calendar", Short: "Show service-specific upcoming releases", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+		if days < 0 {
+			return fmt.Errorf("--days must be a non-negative integer")
+		}
 		startDate := start
 		endDate := end
 		if startDate == "" {
@@ -33,9 +54,9 @@ func arrCalendarCmd(service string, sonarr bool) *cobra.Command {
 		}
 		return render(rows, []string{"Date", "Title", "Episode", "Service"}, strRows)
 	}}
-	cmd.Flags().IntVar(&days, "days", 7, "")
-	cmd.Flags().StringVar(&start, "start", "", "")
-	cmd.Flags().StringVar(&end, "end", "", "")
+	cmd.Flags().IntVar(&days, "days", 7, "Number of upcoming days")
+	cmd.Flags().StringVar(&start, "start", "", "Start date (YYYY-MM-DD)")
+	cmd.Flags().StringVar(&end, "end", "", "End date (YYYY-MM-DD)")
 	return cmd
 }
 
@@ -54,9 +75,24 @@ Options:
   --radarr    Show only movies`,
 		Example: `  arrctl calendar
   arrctl calendar --week
-  arrctl calendar --days 14 --sonarr
-  arrctl calendar --radarr`,
+	  arrctl calendar --days 14 --sonarr
+	  arrctl calendar --radarr`,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 || (len(args) == 1 && args[0] == "help") {
+				return nil
+			}
+			return fmt.Errorf("unknown calendar option: %s", args[0])
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 && args[0] == "help" {
+				return cmd.Help()
+			}
+			if onlySonarr && onlyRadarr {
+				return fmt.Errorf("--sonarr and --radarr cannot be used together")
+			}
+			if days < 0 {
+				return fmt.Errorf("--days must be a non-negative integer")
+			}
 			start, end := calendarRange(time.Now(), days, week)
 			svcs := []string{"sonarr", "radarr"}
 			if onlySonarr {
@@ -68,12 +104,9 @@ Options:
 
 			all := []calendarRow{}
 			for _, s := range svcs {
-				rows, err := fetchServiceCalendar(cmd.Context(), s, s == "sonarr", start, end)
+				rows, err := fetchCalendarForUnified(cmd.Context(), s, s == "sonarr", start, end)
 				if err != nil {
-					if config.IsMissingServiceConfig(err) {
-						if len(svcs) == 1 {
-							return err
-						}
+					if len(svcs) > 1 && (config.IsMissingServiceConfig(err) || isCalendarFetchError(err)) {
 						continue
 					}
 					return err
@@ -83,6 +116,7 @@ Options:
 			sort.Slice(all, func(i, j int) bool { return all[i].Date < all[j].Date })
 			if len(all) == 0 && !quiet {
 				fmt.Fprintf(cmd.ErrOrStderr(), "No releases in this period (%s to %s)\n", start, end)
+				return nil
 			}
 			strRows := make([][]string, 0, len(all))
 			for _, r := range all {
@@ -90,10 +124,10 @@ Options:
 			}
 			return render(all, []string{"Date", "Title", "Episode", "Service"}, strRows)
 		}}
-	cmd.Flags().IntVar(&days, "days", 7, "")
-	cmd.Flags().BoolVar(&week, "week", false, "")
-	cmd.Flags().BoolVar(&onlySonarr, "sonarr", false, "")
-	cmd.Flags().BoolVar(&onlyRadarr, "radarr", false, "")
+	cmd.Flags().IntVar(&days, "days", 7, "Number of upcoming days")
+	cmd.Flags().BoolVar(&week, "week", false, "Show Monday through Sunday of this week")
+	cmd.Flags().BoolVar(&onlySonarr, "sonarr", false, "Show only Sonarr episodes")
+	cmd.Flags().BoolVar(&onlyRadarr, "radarr", false, "Show only Radarr movies")
 	return cmd
 }
 
@@ -104,13 +138,13 @@ func fetchServiceCalendar(ctx context.Context, service string, sonarr bool, star
 	}
 	var items []arrItem
 	if err := c.Do(ctx, "GET", fmt.Sprintf("/api/v3/calendar?start=%s&end=%s", start, end), nil, &items); err != nil {
-		return nil, err
+		return nil, calendarFetchError{service: service, err: err}
 	}
 	rows := []calendarRow{}
 	if sonarr {
 		var series []arrItem
 		if err := c.Do(ctx, "GET", "/api/v3/series", nil, &series); err != nil {
-			return nil, err
+			return nil, calendarFetchError{service: service, err: err}
 		}
 		lookup := map[int]string{}
 		for _, s := range series {

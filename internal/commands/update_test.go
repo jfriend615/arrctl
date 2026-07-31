@@ -64,7 +64,7 @@ func TestNewUpdaterConfiguresHTTPTimeout(t *testing.T) {
 	}
 }
 
-func TestNewUpdaterRejectsSymlinkedExecutable(t *testing.T) {
+func TestNewUpdaterResolvesSymlinkedExecutable(t *testing.T) {
 	oldExecutable := updateExecutable
 	oldRuntimeGOOS := updateRuntimeGOOS
 	oldRuntimeGOARCH := updateRuntimeGOARCH
@@ -88,9 +88,16 @@ func TestNewUpdaterRejectsSymlinkedExecutable(t *testing.T) {
 	updateRuntimeGOOS = "darwin"
 	updateRuntimeGOARCH = "amd64"
 
-	_, err := newUpdater()
-	if err == nil || !strings.Contains(err.Error(), "refusing to update symlinked executable") {
-		t.Fatalf("expected symlink rejection, got %v", err)
+	u, err := newUpdater()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.executable != want {
+		t.Fatalf("expected symlink target %q, got %q", want, u.executable)
 	}
 }
 
@@ -200,6 +207,56 @@ func TestResolveExecutableTargetResolvesSymlink(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("expected symlink to resolve to %q, got %q", want, got)
+	}
+}
+
+func TestResolveExecutableTargetFailsClosedOnSymlinkLoop(t *testing.T) {
+	tmpDir := t.TempDir()
+	loop := filepath.Join(tmpDir, "arrctl")
+	if err := os.Symlink(loop, loop); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveExecutableTarget(loop); err == nil || !strings.Contains(err.Error(), "resolve executable target") {
+		t.Fatalf("expected symlink resolution failure, got %v", err)
+	}
+}
+
+func TestReplaceExecutablePreservesSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "target-arrctl")
+	link := filepath.Join(tmpDir, "arrctl")
+	src := filepath.Join(tmpDir, "new-arrctl")
+	if err := os.WriteFile(target, []byte("old-binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(src, []byte("new-binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	resolved, err := resolveExecutableTarget(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := replaceExecutable(context.Background(), src, resolved); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("expected updater to preserve executable symlink")
+	}
+	got, err := os.ReadFile(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new-binary" {
+		t.Fatalf("unexpected updated contents: %q", got)
 	}
 }
 

@@ -22,7 +22,14 @@ mkdir -p "$ARCHIVE_DIR"
 printf '#!/bin/sh\necho arrctl %s\n' "$VERSION_TAG" > "$ARCHIVE_DIR/arrctl"
 chmod +x "$ARCHIVE_DIR/arrctl"
 tar -czf "$ARCHIVE_PATH" -C "$PAYLOAD" "$ARCHIVE_BASENAME"
-SUM="$(shasum -a 256 "$ARCHIVE_PATH" | awk '{print $1}')"
+if command -v shasum >/dev/null 2>&1; then
+  SUM="$(shasum -a 256 "$ARCHIVE_PATH" | awk '{print $1}')"
+elif command -v sha256sum >/dev/null 2>&1; then
+  SUM="$(sha256sum "$ARCHIVE_PATH" | awk '{print $1}')"
+else
+  echo "FAIL: smoke test requires shasum or sha256sum" >&2
+  exit 1
+fi
 printf '%s  %s\n' "$SUM" "$ARCHIVE_NAME" > "$PAYLOAD/SHA256SUMS"
 
 cat > "$FAKEBIN/uname" <<'EOF'
@@ -89,6 +96,39 @@ sh "$REPO_DIR/install.sh" >/dev/null
 
 [ ! -e "$BIN_DIR/.arrctl-install.$$" ] || {
   echo "FAIL: installer left staging file behind" >&2
+  exit 1
+}
+
+NO_HASH_BIN="$TMP_ROOT/no-hash-bin"
+NO_HASH_LOG="$TMP_ROOT/no-hash.log"
+CURL_MARKER="$TMP_ROOT/curl-called"
+mkdir -p "$NO_HASH_BIN"
+
+cat > "$NO_HASH_BIN/curl" <<EOF
+#!/bin/sh
+touch "$CURL_MARKER"
+exit 1
+EOF
+
+cat > "$NO_HASH_BIN/tar" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+
+chmod +x "$NO_HASH_BIN/curl" "$NO_HASH_BIN/tar"
+
+if PATH="$NO_HASH_BIN" /bin/sh "$REPO_DIR/install.sh" >"$NO_HASH_LOG" 2>&1; then
+  echo "FAIL: installer succeeded without a checksum tool" >&2
+  exit 1
+fi
+
+grep -q 'shasum-or-sha256sum' "$NO_HASH_LOG" || {
+  echo "FAIL: installer did not report missing checksum tool" >&2
+  exit 1
+}
+
+[ ! -e "$CURL_MARKER" ] || {
+  echo "FAIL: installer attempted a download before checksum preflight" >&2
   exit 1
 }
 

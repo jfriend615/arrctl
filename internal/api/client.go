@@ -59,7 +59,7 @@ func (c *Client) Do(ctx context.Context, method, endpoint string, in any, out an
 		return fmt.Errorf("API request failed (HTTP %d): %s", resp.StatusCode, strings.TrimSpace(string(b)))
 	}
 	if out != nil && len(b) > 0 {
-		return json.Unmarshal(b, out)
+		return decodeJSON(b, out)
 	}
 	return nil
 }
@@ -88,7 +88,23 @@ func (c *Client) Tautulli(ctx context.Context, cmd string, params map[string]str
 		return fmt.Errorf("Tautulli request failed (HTTP %d)", resp.StatusCode)
 	}
 	if out != nil {
-		return json.Unmarshal(b, out)
+		return decodeJSON(b, out)
+	}
+	return nil
+}
+
+func decodeJSON(b []byte, out any) error {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if err := decoder.Decode(out); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("invalid JSON: multiple values")
+		}
+		return err
 	}
 	return nil
 }

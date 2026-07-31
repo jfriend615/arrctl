@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -19,6 +20,10 @@ var (
 	completionReadFile              = os.ReadFile
 	completionWriteFile             = os.WriteFile
 	completionStat                  = os.Stat
+	completionLstat                 = os.Lstat
+	completionRename                = os.Rename
+	completionRemove                = os.Remove
+	completionNow                   = time.Now
 )
 
 func completionCmd(root *cobra.Command) *cobra.Command {
@@ -40,7 +45,7 @@ Options:
 			if len(args) > 1 {
 				return cobra.MaximumNArgs(1)(cmd, args)
 			}
-			if len(args) == 1 {
+			if len(args) == 1 && args[0] != "help" {
 				_, err := normalizeCompletionShell(args[0])
 				return err
 			}
@@ -48,6 +53,9 @@ Options:
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
+				if args[0] == "help" {
+					return cmd.Help()
+				}
 				shell = args[0]
 			}
 			resolvedShell, err := detectCompletionShell(shell)
@@ -171,6 +179,18 @@ func installZshCompletion(root *cobra.Command, home string) error {
 }
 
 func writeGeneratedCompletion(root *cobra.Command, shell, path string) error {
+	if err := backupUnmanagedCompletion(path, shell); err != nil {
+		return err
+	}
+	if info, err := completionLstat(path); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			if err := completionRemove(path); err != nil {
+				return fmt.Errorf("replace legacy completion symlink: %w", err)
+			}
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect completion file: %w", err)
+	}
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("create completion file: %w", err)
@@ -185,6 +205,29 @@ func writeGeneratedCompletion(root *cobra.Command, shell, path string) error {
 		return err
 	}
 	return f.Close()
+}
+
+func backupUnmanagedCompletion(path, shell string) error {
+	existing, err := completionReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read existing completion file: %w", err)
+	}
+	marker := "# bash completion for arrctl"
+	if shell == "zsh" {
+		marker = "#compdef arrctl"
+	}
+	if strings.Contains(string(existing), marker) {
+		return nil
+	}
+	backup := path + ".bak." + completionNow().Format("20060102150405")
+	if err := completionRename(path, backup); err != nil {
+		return fmt.Errorf("back up existing completion file: %w", err)
+	}
+	fmt.Fprintf(completionStderr, "Warning: backed up existing completion file to %s\n", backup)
+	return nil
 }
 
 func upsertProfileBlock(path, block string) error {

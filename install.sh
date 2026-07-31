@@ -49,8 +49,16 @@ cleanup_path_sudo() {
 check_dependencies() {
     info "Checking dependencies..."
     missing=""
+    CHECKSUM_TOOL=""
     command -v curl >/dev/null 2>&1 || missing="$missing curl"
     command -v tar >/dev/null 2>&1 || missing="$missing tar"
+    if command -v shasum >/dev/null 2>&1; then
+        CHECKSUM_TOOL="shasum"
+    elif command -v sha256sum >/dev/null 2>&1; then
+        CHECKSUM_TOOL="sha256sum"
+    else
+        missing="$missing shasum-or-sha256sum"
+    fi
     if [ -n "$missing" ]; then
         die "Missing required dependencies:$missing"
     fi
@@ -108,12 +116,12 @@ download_and_install() {
     expected=$(grep "  ${archive}$" "$tmp_dir/SHA256SUMS" | awk '{print $1}')
     [ -n "$expected" ] || die "Could not find checksum for ${archive}"
 
-    if command -v shasum >/dev/null 2>&1; then
+    if [ "$CHECKSUM_TOOL" = "shasum" ]; then
         actual=$(shasum -a 256 "$tmp_dir/$archive" | awk '{print $1}')
-    elif command -v sha256sum >/dev/null 2>&1; then
+    elif [ "$CHECKSUM_TOOL" = "sha256sum" ]; then
         actual=$(sha256sum "$tmp_dir/$archive" | awk '{print $1}')
     else
-        die "Need shasum or sha256sum to verify downloads"
+        die "No checksum tool selected"
     fi
 
     [ "$expected" = "$actual" ] || die "Checksum mismatch for ${archive}"

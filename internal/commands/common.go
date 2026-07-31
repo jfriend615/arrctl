@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,7 +11,10 @@ import (
 	"github.com/jfriend615/arrctl/internal/api"
 	"github.com/jfriend615/arrctl/internal/config"
 	"github.com/jfriend615/arrctl/internal/output"
+	"github.com/spf13/cobra"
 )
+
+var printJSON = output.PrintJSON
 
 func serviceClient(name string) (*api.Client, config.Service, error) {
 	cfg, err := config.Load(cfgPath)
@@ -27,10 +31,19 @@ func serviceClient(name string) (*api.Client, config.Service, error) {
 func render(v any, headers []string, rows [][]string) error {
 	m := output.Mode(format)
 	if m == output.JSON || !output.IsTable(m) {
-		return output.PrintJSON(v)
+		return printJSON(v)
 	}
 	output.PrintTable(headers, rows)
 	return nil
+}
+
+func parentCommandArgs(name string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 || (len(args) == 1 && args[0] == "help") {
+			return nil
+		}
+		return fmt.Errorf("unknown %s command: %s", name, args[0])
+	}
 }
 
 func validateFormat(v string) error {
@@ -117,6 +130,9 @@ func toInt64(v any) int64 {
 		return int64(t)
 	case string:
 		n, _ := strconv.ParseInt(t, 10, 64)
+		return n
+	case json.Number:
+		n, _ := t.Int64()
 		return n
 	default:
 		return 0
