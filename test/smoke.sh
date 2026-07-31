@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-ARRCTL="${REPO_DIR}/bin/arrctl"
+ARRCTL="${ARRCTL_BIN:-${REPO_DIR}/bin/arrctl}"
 
 # Colors (if terminal supports them)
 RED=""
@@ -136,6 +136,7 @@ test_case "arrctl overseerr help works" "$ARRCTL" overseerr help
 test_case "arrctl calendar --help works" "$ARRCTL" calendar --help
 test_case "arrctl calendar help works" "$ARRCTL" calendar help
 test_case "arrctl completion --help works" "$ARRCTL" completion --help
+test_case "arrctl completion help works" "$ARRCTL" completion help
 
 # Invalid command handling
 printf '\n%s\n' "--- Error Handling ---"

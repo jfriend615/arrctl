@@ -1,23 +1,21 @@
 #!/bin/sh
-# arrctl installer
+# arrctl installer (release binary)
 # POSIX compliant - works with sh, dash, bash
 #
 # Usage:
 #   curl -sSL https://raw.githubusercontent.com/jfriend615/arrctl/main/install.sh | sh
 #
-# Environment variables:
-#   INSTALL_DIR  - Where to clone arrctl (default: ~/.arrctl)
-#   BIN_DIR      - Where to create symlink (default: /usr/local/bin)
+# Optional env vars:
+#   BIN_DIR   - install location (default: /usr/local/bin)
+#   VERSION   - release tag to install (default: latest)
 
 set -e
 
-# Defaults
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.arrctl}"
 BIN_DIR="${BIN_DIR:-/usr/local/bin}"
-REPO_URL="https://github.com/jfriend615/arrctl.git"
+VERSION="${VERSION:-latest}"
+REPO="jfriend615/arrctl"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/arrctl"
 
-# Colors (if terminal supports them)
 if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
     RED=$(tput setaf 1 2>/dev/null || printf '')
     GREEN=$(tput setaf 2 2>/dev/null || printf '')
@@ -25,144 +23,163 @@ if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
     BOLD=$(tput bold 2>/dev/null || printf '')
     RESET=$(tput sgr0 2>/dev/null || printf '')
 else
-    RED=""
-    GREEN=""
-    YELLOW=""
-    BOLD=""
-    RESET=""
+    RED=""; GREEN=""; YELLOW=""; BOLD=""; RESET=""
 fi
 
-info() {
-    printf "%s%s%s\n" "$BOLD" "$1" "$RESET"
+info() { printf "%s%s%s\n" "$BOLD" "$1" "$RESET"; }
+success() { printf "%s✓%s %s\n" "$GREEN" "$RESET" "$1"; }
+warn() { printf "%s!%s %s\n" "$YELLOW" "$RESET" "$1"; }
+error() { printf "%s✗%s %s\n" "$RED" "$RESET" "$1" >&2; }
+die() { error "$1"; exit 1; }
+
+cleanup_path() {
+    if [ -n "${1:-}" ] && [ -e "$1" ]; then
+        rm -f "$1"
+    fi
+    return 0
 }
 
-success() {
-    printf "%s✓%s %s\n" "$GREEN" "$RESET" "$1"
+cleanup_path_sudo() {
+    if [ -n "${1:-}" ]; then
+        sudo rm -f "$1" >/dev/null 2>&1 || true
+    fi
+    return 0
 }
 
-warn() {
-    printf "%s!%s %s\n" "$YELLOW" "$RESET" "$1"
-}
-
-error() {
-    printf "%s✗%s %s\n" "$RED" "$RESET" "$1" >&2
-}
-
-die() {
-    error "$1"
-    exit 1
-}
-
-# Check for required dependencies
 check_dependencies() {
     info "Checking dependencies..."
-    
     missing=""
-    
-    if ! command -v curl >/dev/null 2>&1; then
-        missing="$missing curl"
+    CHECKSUM_TOOL=""
+    command -v curl >/dev/null 2>&1 || missing="$missing curl"
+    command -v tar >/dev/null 2>&1 || missing="$missing tar"
+    if command -v shasum >/dev/null 2>&1; then
+        CHECKSUM_TOOL="shasum"
+    elif command -v sha256sum >/dev/null 2>&1; then
+        CHECKSUM_TOOL="sha256sum"
+    else
+        missing="$missing shasum-or-sha256sum"
     fi
-    
-    if ! command -v jq >/dev/null 2>&1; then
-        missing="$missing jq"
-    fi
-    
-    if ! command -v git >/dev/null 2>&1; then
-        missing="$missing git"
-    fi
-    
     if [ -n "$missing" ]; then
         die "Missing required dependencies:$missing"
     fi
-    
-    success "All dependencies found (curl, jq, git)"
+    success "All dependencies found"
 }
 
-# Clone or update the repository
-install_repo() {
-    if [ -d "$INSTALL_DIR" ]; then
-        if [ -d "$INSTALL_DIR/.git" ]; then
-            info "Updating existing installation at $INSTALL_DIR..."
-            cd "$INSTALL_DIR"
-            git pull --ff-only origin main 2>/dev/null || git pull origin main
-            success "Updated to latest version"
-        else
-            die "$INSTALL_DIR exists but is not a git repository. Remove it first or set INSTALL_DIR."
-        fi
+detect_platform() {
+    os=$(uname -s | tr '[:upper:]' '[:lower:]')
+    arch=$(uname -m)
+
+    case "$os" in
+        darwin|linux) ;;
+        *) die "Unsupported OS: $os (supported: darwin, linux)" ;;
+    esac
+
+    case "$arch" in
+        x86_64|amd64) arch="amd64" ;;
+        arm64|aarch64) arch="arm64" ;;
+        *) die "Unsupported architecture: $arch (supported: amd64, arm64)" ;;
+    esac
+
+    PLATFORM_OS="$os"
+    PLATFORM_ARCH="$arch"
+}
+
+resolve_version() {
+    if [ "$VERSION" = "latest" ]; then
+        v_url="$(curl -sSL -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest")"
+        VERSION="${v_url##*/}"
+        [ -n "$VERSION" ] || die "Unable to resolve latest release version"
+    fi
+
+    case "$VERSION" in
+        v*) VERSION_TAG="$VERSION" ; VERSION_NO_V="${VERSION#v}" ;;
+        *) VERSION_TAG="v$VERSION" ; VERSION_NO_V="$VERSION" ;;
+    esac
+}
+
+download_and_install() {
+    archive="arrctl_${VERSION_NO_V}_${PLATFORM_OS}_${PLATFORM_ARCH}.tar.gz"
+    base_url="https://github.com/${REPO}/releases/download/${VERSION_TAG}"
+    archive_url="${base_url}/${archive}"
+    sums_url="${base_url}/SHA256SUMS"
+
+    tmp_dir=$(mktemp -d)
+    trap 'rm -rf "$tmp_dir"' EXIT INT TERM
+
+    info "Downloading ${archive}..."
+    curl -fsSL "$archive_url" -o "$tmp_dir/$archive" || die "Failed to download release artifact: $archive_url"
+
+    info "Downloading checksums..."
+    curl -fsSL "$sums_url" -o "$tmp_dir/SHA256SUMS" || die "Failed to download checksums: $sums_url"
+
+    info "Verifying checksum..."
+    expected=$(grep "  ${archive}$" "$tmp_dir/SHA256SUMS" | awk '{print $1}')
+    [ -n "$expected" ] || die "Could not find checksum for ${archive}"
+
+    if [ "$CHECKSUM_TOOL" = "shasum" ]; then
+        actual=$(shasum -a 256 "$tmp_dir/$archive" | awk '{print $1}')
+    elif [ "$CHECKSUM_TOOL" = "sha256sum" ]; then
+        actual=$(sha256sum "$tmp_dir/$archive" | awk '{print $1}')
     else
-        info "Cloning arrctl to $INSTALL_DIR..."
-        git clone "$REPO_URL" "$INSTALL_DIR"
-        success "Cloned arrctl"
+        die "No checksum tool selected"
     fi
-    
-    # Ensure executable
-    chmod +x "$INSTALL_DIR/bin/arrctl"
-}
 
-# Create symlink in BIN_DIR
-create_symlink() {
-    target="$INSTALL_DIR/bin/arrctl"
-    link="$BIN_DIR/arrctl"
-    
-    info "Creating symlink at $link..."
-    
-    # Check if link already exists and points to correct target
-    if [ -L "$link" ]; then
-        existing_target=$(readlink "$link" 2>/dev/null || true)
-        if [ "$existing_target" = "$target" ]; then
-            success "Symlink already exists and is correct"
-            return 0
-        else
-            warn "Symlink exists but points to $existing_target"
-            # Try to update it
-        fi
-    elif [ -e "$link" ]; then
-        die "$link exists and is not a symlink. Remove it manually first."
-    fi
-    
-    # Create BIN_DIR if it doesn't exist
+    [ "$expected" = "$actual" ] || die "Checksum mismatch for ${archive}"
+    success "Checksum verified"
+
+    info "Extracting..."
+    tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
+
+    extracted_dir="$tmp_dir/arrctl_${VERSION_NO_V}_${PLATFORM_OS}_${PLATFORM_ARCH}"
+    bin_src="$extracted_dir/arrctl"
+    [ -f "$bin_src" ] || die "Extracted archive missing arrctl binary"
+
     if [ ! -d "$BIN_DIR" ]; then
-        if mkdir -p "$BIN_DIR" 2>/dev/null; then
-            : # success
-        elif command -v sudo >/dev/null 2>&1; then
-            sudo mkdir -p "$BIN_DIR"
-        else
-            die "Cannot create $BIN_DIR. Try running with sudo or set BIN_DIR to a writable location."
-        fi
+        if mkdir -p "$BIN_DIR" 2>/dev/null; then :
+        elif command -v sudo >/dev/null 2>&1; then sudo mkdir -p "$BIN_DIR"
+        else die "Cannot create $BIN_DIR. Try setting BIN_DIR to a writable location."; fi
     fi
-    
-    # Try to create symlink, with sudo fallback
-    if ln -sf "$target" "$link" 2>/dev/null; then
-        success "Created symlink"
+
+    target="$BIN_DIR/arrctl"
+    target_dir=$(dirname "$target")
+
+    tmp_target="$target_dir/.arrctl-install.$$"
+    cleanup_path "$tmp_target"
+
+    if cp "$bin_src" "$tmp_target" 2>/dev/null; then
+        trap 'cleanup_path "$tmp_target"; rm -rf "$tmp_dir"' EXIT INT TERM
+        chmod 755 "$tmp_target" || die "Cannot chmod +x $tmp_target"
+        mv -f "$tmp_target" "$target" || die "Cannot replace $target"
     elif command -v sudo >/dev/null 2>&1; then
-        info "Need elevated permissions for $BIN_DIR..."
-        if sudo ln -sf "$target" "$link"; then
-            success "Created symlink (with sudo)"
-        else
-            die "Failed to create symlink even with sudo"
-        fi
+        tmp_target="$target_dir/.arrctl-install.$$"
+        cleanup_path_sudo "$tmp_target"
+        trap 'rm -rf "$tmp_dir"' EXIT INT TERM
+        sudo cp "$bin_src" "$tmp_target" || die "Cannot stage $target"
+        sudo chmod 755 "$tmp_target" || {
+            cleanup_path_sudo "$tmp_target"
+            die "Cannot chmod +x $tmp_target"
+        }
+        sudo mv -f "$tmp_target" "$target" || {
+            cleanup_path_sudo "$tmp_target"
+            die "Cannot replace $target"
+        }
     else
-        warn "Could not create symlink in $BIN_DIR"
-        echo ""
-        echo "Add this to your shell profile instead:"
-        echo "  export PATH=\"\$PATH:$INSTALL_DIR/bin\""
-        return 1
+        die "Cannot write to $target"
     fi
+
+    success "Installed arrctl ${VERSION_TAG} to ${target}"
 }
 
-# Create config template
 create_config() {
     config_file="$CONFIG_DIR/config.json"
-    
     if [ -f "$config_file" ]; then
         success "Config file already exists at $config_file"
         return 0
     fi
-    
+
     info "Creating config template at $config_file..."
-    
     mkdir -p "$CONFIG_DIR"
-    
+
     cat > "$config_file" <<'EOF'
 {
   "sonarr": {
@@ -183,11 +200,10 @@ create_config() {
   }
 }
 EOF
-    
+
     success "Created config template"
 }
 
-# Print final message
 print_success() {
     echo ""
     printf "%s%s========================================%s\n" "$GREEN" "$BOLD" "$RESET"
@@ -204,18 +220,18 @@ print_success() {
     echo "  3. Get started:"
     echo "     arrctl --help"
     echo ""
-    echo "Documentation: https://github.com/jfriend615/arrctl"
+    echo "Documentation: https://github.com/${REPO}"
 }
 
-# Main
 main() {
     echo ""
     printf "%s%sarrctl installer%s\n" "$BOLD" "$GREEN" "$RESET"
     echo ""
-    
+
     check_dependencies
-    install_repo
-    create_symlink
+    detect_platform
+    resolve_version
+    download_and_install
     create_config
     print_success
 }

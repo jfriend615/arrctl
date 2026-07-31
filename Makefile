@@ -1,7 +1,11 @@
 # arrctl Makefile
 # Convenience targets for development and installation
 
-.PHONY: install uninstall test lint clean help
+TMPDIR ?= /tmp
+ARRCTL_TEST_BIN ?= $(TMPDIR)/arrctl-test-bin
+GOCACHE ?= $(TMPDIR)/arrctl-go-build-cache
+
+.PHONY: install uninstall test test-go test-shell lint clean help
 
 # Default target
 help:
@@ -12,14 +16,12 @@ help:
 	@echo "Targets:"
 	@echo "  install    Install arrctl (runs install.sh)"
 	@echo "  uninstall  Remove arrctl installation"
-	@echo "  test       Run smoke tests"
+	@echo "  test       Run Go tests"
+	@echo "  test-go    Run Go tests"
+	@echo "  test-shell Run Go CLI smoke tests"
 	@echo "  lint       Run shellcheck on all scripts"
 	@echo "  clean      Remove generated files"
 	@echo "  help       Show this help"
-	@echo ""
-	@echo "Environment variables:"
-	@echo "  INSTALL_DIR  Installation directory (default: ~/.arrctl)"
-	@echo "  BIN_DIR      Symlink directory (default: /usr/local/bin)"
 
 install:
 	@chmod +x install.sh
@@ -28,14 +30,24 @@ install:
 uninstall:
 	@echo "Removing arrctl..."
 	@rm -f "$${BIN_DIR:-/usr/local/bin}/arrctl" 2>/dev/null || sudo rm -f "$${BIN_DIR:-/usr/local/bin}/arrctl"
-	@rm -rf "$${INSTALL_DIR:-$$HOME/.arrctl}"
 	@echo "arrctl removed. Config at ~/.config/arrctl was preserved."
 	@echo "To remove config: rm -rf ~/.config/arrctl"
 
 test:
-	@chmod +x test/smoke.sh test/completion.sh
-	@./test/smoke.sh
-	@./test/completion.sh
+	@$(MAKE) test-go
+
+test-go:
+	@GOCACHE=$(GOCACHE) go test ./...
+
+test-shell:
+	@set -e; \
+		trap 'rm -f "$(ARRCTL_TEST_BIN)"' EXIT INT TERM; \
+		GOCACHE="$(GOCACHE)" go build -buildvcs=false -o "$(ARRCTL_TEST_BIN)" ./cmd/arrctl; \
+		chmod +x test/smoke.sh test/completion.sh test/go-smoke.sh test/install-smoke.sh; \
+		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/go-smoke.sh; \
+		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/smoke.sh; \
+		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/completion.sh; \
+		./test/install-smoke.sh
 
 lint:
 	@echo "Running shellcheck..."
