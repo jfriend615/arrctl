@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-ARRCTL_BIN="${ARRCTL_BIN:-${REPO_DIR}/bin/arrctl}"
+if [ -z "${ARRCTL_BIN:-}" ]; then
+  echo "ARRCTL_BIN must point to a built Go arrctl binary; use 'make test-shell'" >&2
+  exit 1
+fi
 TMP_COMPLETION="$(mktemp)"
 TMP_HOME=""
 TMP_HOME_ZSH=""
