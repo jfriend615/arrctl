@@ -1,12 +1,15 @@
 #!/bin/sh
-# smoke.sh - Basic sanity checks for arrctl
-# POSIX compliant
+# smoke.sh - CLI smoke tests for the Go arrctl binary
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-ARRCTL="${ARRCTL_BIN:-${REPO_DIR}/bin/arrctl}"
+if [ -z "${ARRCTL_BIN:-}" ]; then
+    printf '%s\n' "ARRCTL_BIN must point to a built Go arrctl binary; use 'make test-shell'" >&2
+    exit 1
+fi
+ARRCTL="$ARRCTL_BIN"
 
 # Colors (if terminal supports them)
 RED=""
@@ -84,41 +87,28 @@ test_case_fail_contains() {
 
 printf '%s\n\n' "=== arrctl Smoke Tests ==="
 
-# Check dependencies
-printf '%s\n' "--- Checking Dependencies ---"
-test_case "curl is available" command -v curl
-test_case "jq is available" command -v jq
-
-# POSIX compliance checks
-printf '\n%s\n' "--- POSIX Compliance ---"
+# Validate the remaining shell-based installer and test tooling.
+printf '%s\n' "--- Shell Tooling Checks ---"
 
 if command -v shellcheck >/dev/null 2>&1; then
-    test_case "shellcheck: bin/arrctl" shellcheck -s sh "${REPO_DIR}/bin/arrctl"
-    test_case "shellcheck: lib/common.sh" shellcheck -s sh "${REPO_DIR}/lib/common.sh"
-    test_case "shellcheck: lib/sonarr.sh" shellcheck -s sh "${REPO_DIR}/lib/sonarr.sh"
-    test_case "shellcheck: lib/radarr.sh" shellcheck -s sh "${REPO_DIR}/lib/radarr.sh"
-    test_case "shellcheck: lib/tautulli.sh" shellcheck -s sh "${REPO_DIR}/lib/tautulli.sh"
-    test_case "shellcheck: lib/overseerr.sh" shellcheck -s sh "${REPO_DIR}/lib/overseerr.sh"
-    test_case "shellcheck: lib/completion.sh" shellcheck -s sh "${REPO_DIR}/lib/completion.sh"
-    test_case "shellcheck: install.sh" shellcheck -s sh "${REPO_DIR}/install.sh"
-    test_case "shellcheck: completions/install.sh" shellcheck -s sh "${REPO_DIR}/completions/install.sh"
+    test_case "shellcheck: installer and test tooling" shellcheck \
+        "${REPO_DIR}/install.sh" \
+        "${REPO_DIR}/test/smoke.sh" \
+        "${REPO_DIR}/test/completion.sh" \
+        "${REPO_DIR}/test/install-smoke.sh"
 else
     skip "shellcheck not installed"
 fi
 
 if command -v dash >/dev/null 2>&1; then
-    test_case "dash -n: bin/arrctl" dash -n "${REPO_DIR}/bin/arrctl"
-    test_case "dash -n: lib/common.sh" dash -n "${REPO_DIR}/lib/common.sh"
-    test_case "dash -n: lib/sonarr.sh" dash -n "${REPO_DIR}/lib/sonarr.sh"
-    test_case "dash -n: lib/radarr.sh" dash -n "${REPO_DIR}/lib/radarr.sh"
-    test_case "dash -n: lib/tautulli.sh" dash -n "${REPO_DIR}/lib/tautulli.sh"
-    test_case "dash -n: lib/overseerr.sh" dash -n "${REPO_DIR}/lib/overseerr.sh"
-    test_case "dash -n: lib/completion.sh" dash -n "${REPO_DIR}/lib/completion.sh"
     test_case "dash -n: install.sh" dash -n "${REPO_DIR}/install.sh"
-    test_case "dash -n: completions/install.sh" dash -n "${REPO_DIR}/completions/install.sh"
+    test_case "dash -n: test/smoke.sh" dash -n "${REPO_DIR}/test/smoke.sh"
+    test_case "dash -n: test/install-smoke.sh" dash -n "${REPO_DIR}/test/install-smoke.sh"
 else
     skip "dash not installed"
 fi
+
+test_case "bash -n: test/completion.sh" bash -n "${REPO_DIR}/test/completion.sh"
 
 # Help output checks
 printf '\n%s\n' "--- Help Commands ---"
@@ -145,6 +135,8 @@ test_case_fail "arrctl sonarr invalid-subcommand fails" "$ARRCTL" sonarr invalid
 test_case_fail "arrctl radarr invalid-subcommand fails" "$ARRCTL" radarr invalid-subcommand
 test_case_fail "arrctl tautulli invalid-subcommand fails" "$ARRCTL" tautulli invalid-subcommand
 test_case_fail "arrctl overseerr invalid-subcommand fails" "$ARRCTL" overseerr invalid-subcommand
+test_case_fail_contains "invalid format is rejected" "invalid format" "$ARRCTL" --format yaml sonarr list
+test_case_fail_contains "conflicting monitored flags are rejected" "cannot be used together" "$ARRCTL" sonarr list --monitored --unmonitored
 
 # Help output contains expected content
 printf '\n%s\n' "--- Help Content ---"

@@ -68,10 +68,15 @@ rm -rf ~/.config/arrctl  # optional: remove config
 
 ## Requirements
 
+The installed binary has no external runtime dependencies.
+
+The one-line installer requires:
+
 - curl
 - tar
 - shasum or sha256sum
-- Go 1.26+ for building from source or running tests
+
+Building from source or running tests requires Go 1.26+.
 
 ## Configuration
 
@@ -191,8 +196,8 @@ cd arrctl
 # Run Go tests
 make test
 
-# Or directly
-go test ./...
+# Run CLI, completion, and installer smoke tests
+make test-shell
 ```
 
 ### Building

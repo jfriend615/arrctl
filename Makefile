@@ -19,7 +19,7 @@ help:
 	@echo "  test       Run Go tests"
 	@echo "  test-go    Run Go tests"
 	@echo "  test-shell Run Go CLI smoke tests"
-	@echo "  lint       Run shellcheck on all scripts"
+	@echo "  lint       Lint installer and test shell tooling"
 	@echo "  clean      Remove generated files"
 	@echo "  help       Show this help"
 
@@ -43,15 +43,14 @@ test-shell:
 	@set -e; \
 		trap 'rm -f "$(ARRCTL_TEST_BIN)"' EXIT INT TERM; \
 		GOCACHE="$(GOCACHE)" go build -buildvcs=false -o "$(ARRCTL_TEST_BIN)" ./cmd/arrctl; \
-		chmod +x test/smoke.sh test/completion.sh test/go-smoke.sh test/install-smoke.sh; \
-		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/go-smoke.sh; \
+		chmod +x test/smoke.sh test/completion.sh test/install-smoke.sh; \
 		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/smoke.sh; \
 		ARRCTL_BIN="$(ARRCTL_TEST_BIN)" ./test/completion.sh; \
 		./test/install-smoke.sh
 
 lint:
-	@echo "Running shellcheck..."
-	@shellcheck bin/arrctl lib/*.sh install.sh test/*.sh
+	@echo "Linting installer and test shell tooling..."
+	@shellcheck install.sh test/*.sh
 	@echo "All checks passed!"
 
 clean:
